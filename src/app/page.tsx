@@ -43,20 +43,20 @@ export default function LandingPage() {
             <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-accent/20 blur-[120px]" />
           </div>
           
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-            <div className="space-y-8 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
+          <div className="max-w-4xl mx-auto relative z-10 text-center">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mx-auto">
                 <Sparkles className="w-3 h-3" />
                 Empowering the next generation of engineers
               </div>
               <h1 className="text-5xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
                 Scale Your Ideas with <span className="text-primary">Confidence.</span>
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0">
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 SkillForge is the ultimate SaaS platform for students and mentors to collaborate, 
                 share large project files, and build professional portfolios.
               </p>
-              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
+              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
                 <Button size="lg" asChild className="h-14 px-10 text-lg shadow-xl shadow-primary/30">
                   <Link href="/register">Start Building Now</Link>
                 </Button>
@@ -64,21 +64,10 @@ export default function LandingPage() {
                   View Public Projects
                 </Button>
               </div>
-              <div className="flex items-center gap-6 justify-center lg:justify-start pt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-6 justify-center pt-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Enterprise Security</span>
                 <span className="flex items-center gap-2"><HardDrive className="w-4 h-4 text-primary" /> 500MB+ File Support</span>
               </div>
-            </div>
-            <div className="relative group">
-               <div className="absolute -inset-1 bg-gradient-to-r from-primary to-accent rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-               <div className="relative bg-white border border-border rounded-2xl shadow-2xl overflow-hidden aspect-[4/3]">
-                 <img 
-                    src="https://picsum.photos/seed/dashboard/800/600" 
-                    alt="SkillForge Dashboard" 
-                    className="w-full h-full object-cover"
-                 />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-               </div>
             </div>
           </div>
         </section>
