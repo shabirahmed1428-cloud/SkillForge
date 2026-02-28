@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -16,12 +15,14 @@ import {
   CardFooter
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, initiateGoogleSignIn } from '@/firebase';
+import { useAuth, useFirestore, useDatabase, initiateGoogleSignIn } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
+  const firestore = useFirestore();
+  const database = useDatabase();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -50,8 +51,9 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = () => {
     try {
-      initiateGoogleSignIn(auth);
-      // Note: Navigation happens automatically via onAuthStateChanged in provider if successful
+      // Pass firestore and database to initiateGoogleSignIn to ensure profile creation
+      initiateGoogleSignIn(auth, firestore, database);
+      // Navigation happens automatically via useEffect in dashboard layout when auth state changes
     } catch (error: any) {
       toast({
         variant: "destructive",
