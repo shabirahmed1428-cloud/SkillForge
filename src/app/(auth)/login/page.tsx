@@ -36,8 +36,12 @@ export default function LoginPage() {
         description: "Successfully signed in to your account.",
       });
 
-      // Redirect to Admin Dashboard if specific credentials are used
-      if (email === 'skillforge@admin.com' && password === 'arham') {
+      // Redirect logic for admin accounts
+      const isAdmin = 
+        (email === 'skillforge@admin.com' && password === 'arham') || 
+        (email === 'waqasarham381@gmail.com' && password === 'arham12');
+
+      if (isAdmin) {
         router.push('/dashboard/admin');
       } else {
         router.push('/dashboard');

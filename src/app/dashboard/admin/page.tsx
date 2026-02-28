@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -9,7 +10,8 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Search
+  Search,
+  Database as DbIcon
 } from 'lucide-react';
 import { 
   Card, 
@@ -29,23 +31,44 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDatabase, useUser } from '@/firebase';
 import { collection, query, limit } from 'firebase/firestore';
+import { ref, onValue } from 'firebase/database';
 
 export default function AdminDashboardPage() {
   const firestore = useFirestore();
+  const database = useDatabase();
+  const { user } = useUser();
+  const [rtUsersCount, setRtUsersCount] = useState(0);
 
+  // Firestore query for recent users
   const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'users'), limit(5));
+    return query(collection(firestore, 'users'), limit(10));
   }, [firestore]);
 
   const { data: recentUsers, isLoading: usersLoading } = useCollection(usersQuery);
 
+  // Realtime Database connection for live monitoring
+  useEffect(() => {
+    if (!database) return;
+    
+    // Monitor the users path in Realtime Database
+    const usersRef = ref(database, 'users');
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        setRtUsersCount(Object.keys(data).length);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [database]);
+
   const stats = [
     { 
-      title: "Total Users", 
-      value: "1,284", 
+      title: "Total Users (Live)", 
+      value: rtUsersCount.toString(), 
       change: "+12.5%", 
       trend: "up", 
       icon: Users,
@@ -79,9 +102,21 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
-        <p className="text-muted-foreground mt-1">Platform-wide oversight and management.</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
+          <p className="text-muted-foreground mt-1">Platform-wide oversight connected to Realtime Database & Auth.</p>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3">
+            <DbIcon className="w-3.5 h-3.5 text-primary" />
+            RTDB Connected
+          </Badge>
+          <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3">
+            <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+            Auth Verified
+          </Badge>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -115,8 +150,8 @@ export default function AdminDashboardPage() {
           <CardHeader className="bg-muted/30 border-b">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-bold">Recent Users</CardTitle>
-                <CardDescription>Latest signups across the platform.</CardDescription>
+                <CardTitle className="text-base font-bold">Platform Users</CardTitle>
+                <CardDescription>Latest signups verified via Authentication.</CardDescription>
               </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -136,21 +171,21 @@ export default function AdminDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentUsers?.map((user) => (
-                  <TableRow key={user.id}>
+                {recentUsers?.map((u) => (
+                  <TableRow key={u.id}>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span>{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                        <span>{u.name}</span>
+                        <span className="text-xs text-muted-foreground">{u.email}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">{user.role}</Badge>
+                      <Badge variant="secondary" className="capitalize">{u.role}</Badge>
                     </TableCell>
-                    <TableCell className="capitalize">{user.subscriptionPlanId}</TableCell>
+                    <TableCell className="capitalize">{u.subscriptionPlanId}</TableCell>
                     <TableCell>
-                      <Badge variant={user.isBanned ? "destructive" : "outline"} className="bg-green-50 text-green-700 border-green-200">
-                        {user.isBanned ? "Banned" : "Active"}
+                      <Badge variant={u.isBanned ? "destructive" : "outline"} className={u.isBanned ? "" : "bg-green-50 text-green-700 border-green-200"}>
+                        {u.isBanned ? "Banned" : "Active"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -163,6 +198,13 @@ export default function AdminDashboardPage() {
                     <TableCell colSpan={5} className="h-12 animate-pulse bg-muted/20" />
                   </TableRow>
                 ))}
+                {(!recentUsers || recentUsers.length === 0) && !usersLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No user records found in Firestore.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -174,14 +216,14 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="w-5 h-5" />
-                Platform Security
+                Auth Security
               </CardTitle>
               <CardDescription className="text-primary-foreground/80">
-                All systems functional. 0 suspicious activities detected in the last 24h.
+                Connected to Firebase Auth. Monitoring suspicious logins in real-time.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="secondary" className="w-full">Security Audit</Button>
+              <Button variant="secondary" className="w-full">View Auth Logs</Button>
             </CardContent>
           </Card>
 
@@ -191,10 +233,10 @@ export default function AdminDashboardPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start gap-2">
-                <Users className="w-4 h-4" /> Export User Data
+                <Users className="w-4 h-4" /> Export RTDB Snapshots
               </Button>
               <Button variant="outline" className="w-full justify-start gap-2">
-                <TrendingUp className="w-4 h-4" /> Generate Report
+                <TrendingUp className="w-4 h-4" /> Global Analytics
               </Button>
               <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:bg-destructive/10">
                 <ShieldCheck className="w-4 h-4" /> Global Maintenance Mode

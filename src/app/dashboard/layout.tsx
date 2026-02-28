@@ -41,8 +41,10 @@ export default function DashboardLayout({
 
   if (!user) return null;
 
-  // Determine role, forcing 'admin' for the specific admin account
-  const currentRole = user.email === 'skillforge@admin.com' ? 'admin' : (userProfile?.role || 'student');
+  // Determine role, forcing 'admin' for specific admin accounts
+  const adminEmails = ['skillforge@admin.com', 'waqasarham381@gmail.com'];
+  const isExplicitAdmin = user.email && adminEmails.includes(user.email);
+  const currentRole = isExplicitAdmin ? 'admin' : (userProfile?.role || 'student');
 
   return (
     <SidebarProvider defaultOpen>
