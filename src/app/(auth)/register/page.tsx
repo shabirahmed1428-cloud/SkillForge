@@ -18,14 +18,16 @@ import {
 } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useDatabase } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, set } from 'firebase/database';
 
 export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
+  const database = useDatabase();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('student');
@@ -40,18 +42,27 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await setDoc(doc(firestore, 'users', user.uid), {
+      const profileData = {
         id: user.uid,
         name,
         email,
         role,
         photoURL: `https://picsum.photos/seed/${user.uid}/200/200`,
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         isBanned: false,
         storageUsedMB: 0,
         storageLimitMB: 500,
         subscriptionPlanId: 'free'
+      };
+
+      // 1. Save to Firestore (Primary DB)
+      await setDoc(doc(firestore, 'users', user.uid), {
+        ...profileData,
+        createdAt: serverTimestamp() // Use Firestore server timestamp
       });
+
+      // 2. Save to Realtime Database (Secondary DB for real-time syncing)
+      await set(ref(database, `users/${user.uid}`), profileData);
 
       toast({
         title: "Account created!",

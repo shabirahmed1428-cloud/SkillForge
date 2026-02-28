@@ -24,8 +24,9 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, useDatabase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, set, update } from 'firebase/database';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+  const database = useDatabase();
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -106,12 +108,12 @@ export default function DashboardPage() {
     return result;
   };
 
-  const simulateUpload = () => {
-    if (!file || !user || !firestore) return;
+  const simulateUpload = async () => {
+    if (!file || !user || !firestore || !database) return;
     setUploading(true);
     setProgress(0);
     
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       setProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
@@ -129,20 +131,23 @@ export default function DashboardPage() {
             ownerId: user.uid,
             visibility: 'public',
             status: 'approved',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             likesCount: 0,
             viewsCount: 0,
-            fileURL: 'https://placeholder.com/file', // In real app, this would be the Storage URL
+            fileURL: 'https://placeholder.com/file',
             fileSizeMB: fileSizeMB,
             shareKey: shareKey,
             shareKeyEnabled: true
           };
 
-          // 1. Save Project
-          setDocumentNonBlocking(projectRef, projectData, { merge: true });
+          // --- FIRESTORE WRITES (Non-blocking) ---
+          setDocumentNonBlocking(projectRef, {
+            ...projectData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
 
-          // 2. Save Share Key Mapping
           setDocumentNonBlocking(doc(firestore, 'share_keys', shareKey), {
             id: shareKey,
             projectId: projectId,
@@ -150,9 +155,20 @@ export default function DashboardPage() {
             createdAt: serverTimestamp()
           }, { merge: true });
 
-          // 3. Update User Storage Usage
           if (userProfile) {
             updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+              storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
+            });
+          }
+
+          // --- REALTIME DATABASE WRITES ---
+          set(ref(database, `projects/${projectId}`), projectData);
+          set(ref(database, `share_keys/${shareKey}`), {
+            projectId: projectId,
+            createdAt: projectData.createdAt
+          });
+          if (userProfile) {
+            update(ref(database, `users/${user.uid}`), {
               storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
             });
           }
