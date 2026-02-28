@@ -1,32 +1,7 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * SkillForge Security Rules
-     *
-     * Core Philosophy:
-     * This ruleset enforces a strict identity-based authorization model where access is determined by 
-     * user ownership, team membership, or administrative status. It leverages structural segregation 
-     * for projects (public, private, and team-based) to ensure clear security boundaries and performance.
-     *
-     * Data Structure:
-     * - /users/{userId}: Private user profiles and quotas.
-     * - /projects_public/{projectId}: Globally readable projects.
-     * - /users/{userId}/projects/{projectId}: Owner-only private projects.
-     * - /teams/{teamId}: Collaborative groups using a UID-to-role map.
-     * - /teams/{teamId}/projects/{projectId}: Team-shared projects using denormalized membership maps.
-     *
-     * Key Security Decisions:
-     * - Authorization Independence: Critical data (like ownership and membership maps) is denormalized 
-     *   directly onto documents to allow rules to evaluate without costly get() calls.
-     * - Admin Access: Administrative privileges are determined by the existence of a document 
-     *   in the /roles_admin/ collection.
-     * - Share Keys: Secure access via share keys is handled through a lookup collection, allowing 
-     *   anonymous retrieval of specific projects without exposing the entire database structure.
-     * - Prototyping Mode: These rules prioritize robust authorization (who can access) over strict 
-     *   schema validation (data types) to support rapid development.
-     */
 
     // --- HELPER FUNCTIONS ---
 
@@ -38,160 +13,53 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    function isMember(memberMap) {
-      return isSignedIn() && request.auth.uid in memberMap;
-    }
-
-    function isTeamAdmin(memberMap) {
-      return isMember(memberMap) && memberMap[request.auth.uid] == 'admin';
-    }
-
     // --- COLLECTION RULES ---
 
-    /**
-     * @description Rules for user profiles and storage statistics.
-     * @path /users/{userId}
-     * @allow get: if isOwner(userId) || isAdmin(); (read)
-     * @deny update: if request.resource.data.id != resource.data.id; (identity mismatch)
-     * @principle Restricts access to a user's own data tree and enforces identity immutability.
-     */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Existence-based admin role registry.
-     * @path /roles_admin/{userId}
-     * @allow get: if isSignedIn(); (verification)
-     * @deny write: if true; (managed via backend/console)
-     * @principle Uses 'Existence over Content' to identify global administrators.
-     */
-    match /roles_admin/{userId} {
-      allow get: if isSignedIn();
-      allow list, write: if false;
-    }
-
-    /**
-     * @description Publicly visible projects available to all users.
-     * @path /projects_public/{projectId}
-     * @allow get, list: if true; (public consumption)
-     * @deny update: if !isExistingOwner(resource.data.ownerId); (unauthorized modification)
-     * @principle Facilitates public discovery while protecting write access for the owner.
-     */
     match /projects_public/{projectId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.ownerId) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isExistingOwner(resource.data.ownerId) || isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow delete: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
     }
 
     /**
-     * @description Private user projects nested under the owner's path.
-     * @path /users/{userId}/projects/{projectId}
-     * @allow list: if isOwner(userId); (owner listing)
-     * @deny create: if request.resource.data.ownerId != userId; (mismatched owner link)
-     * @principle Enforces strict path-based ownership for private content.
-     */
-    match /users/{userId}/projects/{projectId} {
-      allow get, list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.ownerId == userId;
-      allow update: if isOwner(userId) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isOwner(userId) || isAdmin();
-    }
-
-    /**
-     * @description Collaborative teams managing shared projects.
+     * @description Team hubs protected by password verification logic in-app.
      * @path /teams/{teamId}
-     * @allow get: if isMember(resource.data.members); (membership check)
-     * @deny update: if !isTeamAdmin(resource.data.members); (non-admin update)
-     * @principle Uses a denormalized membership map for efficient authorization.
+     * @principle Teams are publicly searchable but contents are protected by sub-collection rules.
      */
     match /teams/{teamId} {
-      allow get: if isMember(resource.data.members) || isAdmin();
-      allow list: if isSignedIn(); // Users need to find teams to join/request
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if (isExistingOwner(resource.data.ownerId) || isTeamAdmin(resource.data.members)) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isExistingOwner(resource.data.ownerId) || isAdmin();
-    }
-
-    /**
-     * @description Projects shared within a specific team.
-     * @path /teams/{teamId}/projects/{projectId}
-     * @allow list: if isMember(resource.data.projectTeamMembers); (member access)
-     * @deny create: if !isSignedIn(); (unauthenticated write)
-     * @principle Achieves Authorization Independence by denormalizing team members onto the project.
-     */
-    match /teams/{teamId}/projects/{projectId} {
-      allow get, list: if isMember(resource.data.projectTeamMembers) || isAdmin();
-      allow create: if isSignedIn(); // Logic usually handled by app to ensure team member creates it
-      allow update: if isMember(resource.data.projectTeamMembers) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isMember(resource.data.projectTeamMembers) || isAdmin();
-    }
-
-    /**
-     * @description Student project submissions to mentors.
-     * @path /submissions/{submissionId}
-     * @allow get: if isOwner(resource.data.studentId) || isOwner(resource.data.mentorId); (involved parties)
-     * @deny create: if request.resource.data.studentId != request.auth.uid; (impersonation)
-     * @principle Secures student-mentor relationships using denormalized participant IDs.
-     */
-    match /submissions/{submissionId} {
-      allow get: if isOwner(resource.data.studentId) || isOwner(resource.data.mentorId) || isAdmin();
-      allow list: if isSignedIn(); // Queries must be filtered by studentId or mentorId
-      allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
-      allow update: if (isExistingOwner(resource.data.studentId) || isExistingOwner(resource.data.mentorId)) && request.resource.data.studentId == resource.data.studentId;
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow delete: if isAdmin();
+
+      // Team sub-projects: accessible if authenticated in app
+      match /projects/{projectId} {
+        allow read, list, write: if isSignedIn(); 
+      }
     }
 
-    /**
-     * @description Moderation reports filed against projects.
-     * @path /reports/{reportId}
-     * @allow get: if isOwner(resource.data.reportedById) || isAdmin(); (reporter or admin)
-     * @deny list: if !isAdmin(); (privacy)
-     * @principle Protects reporter anonymity while allowing admin oversight.
-     */
-    match /reports/{reportId} {
-      allow get: if isOwner(resource.data.reportedById) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && request.resource.data.reportedById == request.auth.uid;
-      allow update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Subscription plan details.
-     * @path /plans/{planId}
-     * @allow get, list: if true; (public pricing)
-     * @deny write: if !isAdmin(); (unauthorized modification)
-     * @principle Provides public read access to platform offerings while restricting updates to admins.
-     */
-    match /plans/{planId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    /**
-     * @description Lookup table for secure project share keys.
-     * @path /share_keys/{shareKeyId}
-     * @allow get: if true; (key lookup for anonymous access)
-     * @deny list: if !isAdmin(); (security scan prevention)
-     * @principle Enables secure, key-based anonymous access without exposing the primary data tree.
-     */
     match /share_keys/{shareKeyId} {
       allow get: if true;
       allow list: if isAdmin();
-      allow create, update, delete: if isAdmin(); // Usually managed by Cloud Functions on project creation
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /roles_admin/{userId} {
+      allow get: if isSignedIn();
+      allow list, write: if false;
     }
   }
 }

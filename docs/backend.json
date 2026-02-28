@@ -22,10 +22,7 @@
         },
         "role": {
           "type": "string",
-          "description": "The role of the user within the platform (student, mentor, admin).",
-          "items": {
-            "type": "string"
-          }
+          "description": "The role of the user within the platform (student, mentor, admin)."
         },
         "photoURL": {
           "type": "string",
@@ -122,6 +119,10 @@
         },
         "shareKeyEnabled": {
           "type": "boolean"
+        },
+        "teamId": {
+          "type": "string",
+          "description": "Optional reference to a Team."
         }
       },
       "required": [
@@ -134,12 +135,35 @@
         "createdAt",
         "updatedAt",
         "likesCount",
-        "viewsCount",
-        "fileURL",
-        "fileSizeMB",
-        "shareKey",
-        "shareKeyEnabled"
+        "viewsCount"
       ]
+    },
+    "Team": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Team",
+      "type": "object",
+      "description": "Represents a collaborative team hub protected by a name and password.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Unique name of the team."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password required to access the team hub."
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "password", "ownerId", "createdAt"]
     }
   },
   "auth": {
@@ -170,13 +194,23 @@
         }
       },
       {
-        "path": "/users/{userId}/projects/{projectId}",
+        "path": "/teams/{teamId}",
+        "definition": {
+          "entityName": "Team",
+          "schema": {
+            "$ref": "#/backend/entities/Team"
+          },
+          "description": "Stores team hub configurations."
+        }
+      },
+      {
+        "path": "/teams/{teamId}/projects/{projectId}",
         "definition": {
           "entityName": "Project",
           "schema": {
             "$ref": "#/backend/entities/Project"
           },
-          "description": "Stores private user projects."
+          "description": "Stores projects shared within a team hub."
         }
       }
     ]
