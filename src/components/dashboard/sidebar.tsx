@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
-  Briefcase, 
   Users, 
   FileCheck, 
   LogOut,
@@ -33,7 +32,6 @@ import { useRouter } from 'next/navigation';
 
 const navItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Projects', href: '/dashboard/projects', icon: Briefcase },
   { name: 'Team Hub', href: '/dashboard/teams', icon: Users },
   { name: 'Reviews', href: '/dashboard/submissions', icon: FileCheck },
 ];
