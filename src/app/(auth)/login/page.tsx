@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,11 +30,18 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      
       toast({
         title: "Welcome back!",
         description: "Successfully signed in to your account.",
       });
-      router.push('/dashboard');
+
+      // Redirect to Admin Dashboard if specific credentials are used
+      if (email === 'skillforge@admin.com' && password === 'arham') {
+        router.push('/dashboard/admin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -98,6 +104,7 @@ export default function LoginPage() {
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
               <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {loading ? 'Processing...' : 'Sign in'}
               </Button>
               <p className="text-sm text-center text-muted-foreground">

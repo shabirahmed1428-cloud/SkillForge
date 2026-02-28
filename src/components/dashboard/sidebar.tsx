@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -9,7 +8,9 @@ import {
   FileCheck, 
   LogOut,
   TrendingUp,
-  HardDrive
+  HardDrive,
+  ShieldCheck,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -37,8 +38,9 @@ const navItems = [
 ];
 
 const adminItems = [
-  { name: 'User Management', href: '/dashboard/admin/users', icon: TrendingUp },
-  { name: 'Storage Analytics', href: '/dashboard/admin/analytics', icon: TrendingUp },
+  { name: 'Admin Dashboard', href: '/dashboard/admin', icon: ShieldCheck },
+  { name: 'User Management', href: '/dashboard/admin/users', icon: Users },
+  { name: 'Storage Analytics', href: '/dashboard/admin/analytics', icon: Activity },
 ];
 
 interface DashboardSidebarProps {
@@ -119,19 +121,21 @@ export function DashboardSidebar({
 
       <SidebarFooter className="p-4 border-t border-sidebar-border bg-sidebar-accent/30">
         <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-medium">
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <HardDrive className="w-3 h-3" />
-                Storage Usage
-              </span>
-              <span className="text-foreground">{storageUsed}MB / {storageLimit}MB</span>
+          {userRole !== 'admin' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <HardDrive className="w-3 h-3" />
+                  Storage Usage
+                </span>
+                <span className="text-foreground">{storageUsed}MB / {storageLimit}MB</span>
+              </div>
+              <Progress value={usagePercent} className="h-1.5" />
+              <Button variant="outline" size="sm" className="w-full text-xs h-8 mt-2" asChild>
+                <Link href="/dashboard/billing">Upgrade Storage</Link>
+              </Button>
             </div>
-            <Progress value={usagePercent} className="h-1.5" />
-            <Button variant="outline" size="sm" className="w-full text-xs h-8 mt-2" asChild>
-              <Link href="/dashboard/billing">Upgrade Storage</Link>
-            </Button>
-          </div>
+          )}
           
           <div className="flex items-center gap-3 py-2 px-1">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">

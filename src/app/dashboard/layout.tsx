@@ -1,4 +1,3 @@
-
 "use client";
 
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -42,11 +41,14 @@ export default function DashboardLayout({
 
   if (!user) return null;
 
+  // Determine role, forcing 'admin' for the specific admin account
+  const currentRole = user.email === 'skillforge@admin.com' ? 'admin' : (userProfile?.role || 'student');
+
   return (
     <SidebarProvider defaultOpen>
       <div className="flex min-h-screen w-full bg-background">
         <DashboardSidebar 
-          userRole={userProfile?.role || 'student'} 
+          userRole={currentRole} 
           userName={userProfile?.name || user.displayName || 'User'}
           storageUsed={userProfile?.storageUsedMB || 0}
           storageLimit={userProfile?.storageLimitMB || 500}
