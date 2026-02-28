@@ -25,7 +25,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, limit, doc } from 'firebase/firestore';
+import { collection, query, where, limit, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
@@ -51,7 +51,6 @@ export default function DashboardPage() {
 
   const { data: recentProjects } = useCollection(projectsQuery);
 
-  // Fetch real user profile data for storage info
   const userDocRef = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -97,7 +96,7 @@ export default function DashboardPage() {
   };
 
   const simulateUpload = () => {
-    if (!file) return;
+    if (!file || !user || !firestore) return;
     setUploading(true);
     setProgress(0);
     
@@ -106,20 +105,23 @@ export default function DashboardPage() {
         if (prev >= 100) {
           clearInterval(interval);
           setUploading(false);
+          
+          // In a real app, this would be a storage upload then firestore update
           toast({
             title: "Upload complete!",
             description: `${file.name} is now part of your portfolio.`
           });
+          setFile(null);
           return 100;
         }
-        return prev + 5;
+        return prev + 10;
       });
-    }, 100);
+    }, 150);
   };
 
   const storageUsed = userProfile?.storageUsedMB ?? 0;
   const storageLimit = userProfile?.storageLimitMB ?? 500;
-  const storageUsagePercent = (storageUsed / storageLimit) * 100;
+  const storageUsagePercent = Math.min((storageUsed / storageLimit) * 100, 100);
 
   return (
     <div className="space-y-8">
@@ -225,7 +227,9 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{storageLimit} MB</div>
                 <Progress value={storageUsagePercent} className="h-1.5 mt-2" />
-                <p className="text-[10px] text-muted-foreground mt-1">{storageUsed}MB used of {storageLimit}MB limit</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {storageUsed}MB used of {storageLimit}MB limit
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -238,7 +242,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="text-2xl font-bold">Encrypted</div>
                 <div className="flex items-center gap-1.5 text-[10px] text-green-600 mt-2 font-medium">
-                  <CheckCircle2 className="w-3 h-3" /> All share keys active
+                  <CheckCircle2 className="w-3 h-3" /> Secure session active
                 </div>
               </CardContent>
             </Card>
@@ -268,7 +272,7 @@ export default function DashboardPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {recentProjects?.map(project => (
-                  <div key={project.id} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
+                  <Link key={project.id} href={`/shared/${project.shareKey}`} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
                     <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground">
                       <FileText className="w-4 h-4" />
                     </div>
@@ -276,7 +280,7 @@ export default function DashboardPage() {
                       <p className="text-sm font-medium truncate">{project.title}</p>
                       <p className="text-[10px] text-muted-foreground uppercase">{project.visibility}</p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
                 {(!recentProjects || recentProjects.length === 0) && (
                   <p className="p-4 text-sm text-muted-foreground text-center">No projects yet.</p>

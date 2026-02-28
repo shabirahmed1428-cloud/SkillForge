@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/firebase';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function LandingPage() {
   const { user } = useUser();
@@ -43,13 +45,13 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative py-20 lg:py-32 px-4 lg:px-12 overflow-hidden bg-background">
+        <section className="relative py-20 lg:py-32 px-4 lg:px-12 overflow-hidden bg-background text-center">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-30 pointer-events-none">
             <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/20 blur-[120px]" />
             <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-accent/20 blur-[120px]" />
           </div>
           
-          <div className="max-w-4xl mx-auto relative z-10 text-center">
+          <div className="max-w-4xl mx-auto relative z-10">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mx-auto">
                 <Sparkles className="w-3 h-3" />
@@ -163,9 +165,6 @@ function AccessKeyForm() {
     </div>
   );
 }
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 function FeatureCard({ icon: Icon, title, description }: { icon: any, title: string, description: string }) {
   return (
