@@ -89,15 +89,14 @@ export default function RegisterPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">SF</div>
             <span className="font-headline text-2xl font-bold tracking-tight text-foreground">SkillForge</span>
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Create account</h1>
           <p className="text-muted-foreground">Join the community of builders and mentors</p>
         </div>
 
         <Card className="border-none shadow-xl">
           <form onSubmit={handleSubmit}>
             <CardHeader>
-              <CardTitle>Choose Your Role</CardTitle>
-              <CardDescription>Select how you want to use SkillForge</CardDescription>
+              <CardTitle>Choose Role</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <RadioGroup defaultValue="student" onValueChange={setRole} className="grid grid-cols-2 gap-4">
@@ -124,7 +123,7 @@ export default function RegisterPage() {
               </RadioGroup>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">Name</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
@@ -172,7 +171,7 @@ export default function RegisterPage() {
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
               <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={loading}>
-                {loading ? 'Creating account...' : 'Sign Up'}
+                {loading ? 'Creating...' : 'Sign Up'}
               </Button>
               <p className="text-sm text-center text-muted-foreground">
                 Already have an account? <Link href="/login" className="text-primary font-medium hover:underline">Sign in</Link>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -54,7 +55,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">SF</div>
             <span className="font-headline text-2xl font-bold tracking-tight text-foreground">SkillForge</span>
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Sign in to your account</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
           <p className="text-muted-foreground">Enter your credentials to access your dashboard</p>
         </div>
 
@@ -80,7 +81,6 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Link href="/forgot-password" title="Recover Password" className="text-xs text-primary hover:underline">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -101,7 +101,7 @@ export default function LoginPage() {
                 {loading ? 'Processing...' : 'Sign in'}
               </Button>
               <p className="text-sm text-center text-muted-foreground">
-                Don't have an account? <Link href="/register" className="text-primary font-medium hover:underline">Sign up for free</Link>
+                Don't have an account? <Link href="/register" className="text-primary font-medium hover:underline">Sign up</Link>
               </p>
             </CardFooter>
           </form>
