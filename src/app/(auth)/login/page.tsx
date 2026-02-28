@@ -16,7 +16,7 @@ import {
   CardFooter
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/firebase';
+import { useAuth, initiateGoogleSignIn } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
@@ -48,6 +48,19 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleSignIn = () => {
+    try {
+      initiateGoogleSignIn(auth);
+      // Note: Navigation happens automatically via onAuthStateChanged in provider if successful
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google Sign In failed",
+        description: error.message || "Could not sign in with Google.",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-md space-y-8">
@@ -63,7 +76,7 @@ export default function LoginPage() {
         <Card className="border-none shadow-xl">
           <CardHeader className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleGoogleSignIn}>
                 <Chrome className="w-4 h-4" /> Google
               </Button>
               <Button variant="outline" className="gap-2">
