@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
-  const db = useDatabase(); // Renamed to 'db' to match requested snippet
+  const db = useDatabase();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('student');
@@ -37,6 +37,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -86,7 +87,7 @@ export default function RegisterPage() {
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">SF</div>
-            <span className="font-headline text-2xl font-bold tracking-tight">SkillForge</span>
+            <span className="font-headline text-2xl font-bold tracking-tight text-foreground">SkillForge</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
           <p className="text-muted-foreground">Join the community of builders and mentors</p>
@@ -133,6 +134,7 @@ export default function RegisterPage() {
                     required 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -148,6 +150,7 @@ export default function RegisterPage() {
                     required 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -162,6 +165,7 @@ export default function RegisterPage() {
                     required 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
