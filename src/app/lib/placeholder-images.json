@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-bg",
+      "description": "Abstract blue professional background",
+      "imageUrl": "https://picsum.photos/seed/skillforge-hero/1200/800",
+      "imageHint": "abstract blue"
+    },
+    {
+      "id": "avatar-placeholder",
+      "description": "User profile avatar",
+      "imageUrl": "https://picsum.photos/seed/avatar/200/200",
+      "imageHint": "person avatar"
+    }
+  ]
+}
