@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
-  const database = useDatabase();
+  const db = useDatabase(); // Renamed to 'db' to match requested snippet
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('student');
@@ -58,11 +58,11 @@ export default function RegisterPage() {
       // 1. Save to Firestore (Primary DB)
       await setDoc(doc(firestore, 'users', user.uid), {
         ...profileData,
-        createdAt: serverTimestamp() // Use Firestore server timestamp
+        createdAt: serverTimestamp() 
       });
 
-      // 2. Save to Realtime Database (Secondary DB for real-time syncing)
-      await set(ref(database, `users/${user.uid}`), profileData);
+      // 2. Save to Realtime Database using the exact requested code
+      await set(ref(db, "users/" + user.uid), { email: user.email });
 
       toast({
         title: "Account created!",
