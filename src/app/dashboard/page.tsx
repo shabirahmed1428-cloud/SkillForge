@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from 'react';
@@ -24,17 +23,20 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, useDatabase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, useDatabase, useStorage, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
-import { ref, set, update } from 'firebase/database';
+import { ref as dbRef, set, update } from 'firebase/database';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit as per storage rules
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
   const database = useDatabase();
+  const storage = useStorage();
+  
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -74,11 +76,11 @@ export default function DashboardPage() {
   const validateAndSetFile = (selectedFile: File) => {
     setError(null);
     if (selectedFile.size > MAX_FILE_SIZE) {
-      setError("File size exceeds 500MB limit.");
+      setError("File size exceeds 10MB limit.");
       toast({
         variant: "destructive",
         title: "File too large",
-        description: "Please select a file smaller than 500MB."
+        description: "Your storage rules limit uploads to 10MB."
       });
       return;
     }
@@ -108,81 +110,97 @@ export default function DashboardPage() {
     return result;
   };
 
-  const simulateUpload = async () => {
-    if (!file || !user || !firestore || !database) return;
+  const handleUpload = async () => {
+    if (!file || !user || !firestore || !database || !storage) return;
+    
     setUploading(true);
     setProgress(0);
     
-    const interval = setInterval(async () => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setUploading(false);
-          
-          const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
-          const projectId = doc(collection(firestore, 'projects_public')).id;
-          const shareKey = generateKey();
-          const projectRef = doc(firestore, 'projects_public', projectId);
+    const projectId = doc(collection(firestore, 'projects_public')).id;
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${file.name}`;
+    const fileRef = storageRef(storage, `projects/${projectId}/files/${fileName}`);
+    
+    const uploadTask = uploadBytesResumable(fileRef, file);
 
-          const projectData = {
-            id: projectId,
-            title: file.name,
-            description: `Automated project creation from file upload: ${file.name}`,
-            ownerId: user.uid,
-            visibility: 'public',
-            status: 'approved',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            likesCount: 0,
-            viewsCount: 0,
-            fileURL: 'https://placeholder.com/file',
-            fileSizeMB: fileSizeMB,
-            shareKey: shareKey,
-            shareKeyEnabled: true
-          };
+    uploadTask.on('state_changed', 
+      (snapshot) => {
+        const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setProgress(Math.round(p));
+      }, 
+      (error) => {
+        setUploading(false);
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: error.message
+        });
+      }, 
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
+        const shareKey = generateKey();
+        const projectRef = doc(firestore, 'projects_public', projectId);
 
-          // --- FIRESTORE WRITES (Non-blocking) ---
-          setDocumentNonBlocking(projectRef, {
-            ...projectData,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          }, { merge: true });
+        const projectData = {
+          id: projectId,
+          title: file.name,
+          description: `Project file: ${file.name}`,
+          ownerId: user.uid,
+          visibility: 'public',
+          status: 'approved',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          likesCount: 0,
+          viewsCount: 0,
+          fileURL: downloadURL,
+          fileSizeMB: fileSizeMB,
+          shareKey: shareKey,
+          shareKeyEnabled: true
+        };
 
-          setDocumentNonBlocking(doc(firestore, 'share_keys', shareKey), {
-            id: shareKey,
-            projectId: projectId,
-            projectPath: projectRef.path,
-            createdAt: serverTimestamp()
-          }, { merge: true });
+        // --- FIRESTORE WRITES (Non-blocking) ---
+        setDocumentNonBlocking(projectRef, {
+          ...projectData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
 
-          if (userProfile) {
-            updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-              storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
-            });
-          }
+        setDocumentNonBlocking(doc(firestore, 'share_keys', shareKey), {
+          id: shareKey,
+          projectId: projectId,
+          projectPath: projectRef.path,
+          createdAt: serverTimestamp()
+        }, { merge: true });
 
-          // --- REALTIME DATABASE WRITES ---
-          set(ref(database, `projects/${projectId}`), projectData);
-          set(ref(database, `share_keys/${shareKey}`), {
-            projectId: projectId,
-            createdAt: projectData.createdAt
+        if (userProfile) {
+          updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+            storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
           });
-          if (userProfile) {
-            update(ref(database, `users/${user.uid}`), {
-              storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
-            });
-          }
-
-          toast({
-            title: "Upload complete!",
-            description: `${file.name} is now part of your portfolio.`
-          });
-          setFile(null);
-          return 100;
         }
-        return prev + 10;
-      });
-    }, 150);
+
+        // --- REALTIME DATABASE WRITES ---
+        set(dbRef(database, `projects/${projectId}`), projectData);
+        set(dbRef(database, `share_keys/${shareKey}`), {
+          projectId: projectId,
+          createdAt: projectData.createdAt
+        });
+        if (userProfile) {
+          update(dbRef(database, `users/${user.uid}`), {
+            storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
+          });
+        }
+
+        toast({
+          title: "Project published!",
+          description: `${file.name} is now live in your portfolio.`
+        });
+        
+        setUploading(false);
+        setFile(null);
+        setProgress(0);
+      }
+    );
   };
 
   const storageUsed = userProfile?.storageUsedMB ?? 0;
@@ -209,7 +227,7 @@ export default function DashboardPage() {
           <Card className="border-2 border-dashed border-muted bg-card/50 transition-colors">
             <CardHeader>
               <CardTitle>Project Upload</CardTitle>
-              <CardDescription>Drag and drop your project assets (Max 500MB)</CardDescription>
+              <CardDescription>Drag and drop your project assets (Max 10MB per rules)</CardDescription>
             </CardHeader>
             <CardContent>
               <div 
@@ -252,7 +270,7 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-2">
                     <p className="font-semibold text-lg">Click or drag file to this area to upload</p>
-                    <p className="text-sm text-muted-foreground">Support for PDF, ZIP, DOCX, MP4 (Max 500MB)</p>
+                    <p className="text-sm text-muted-foreground">Support for PDF, ZIP, DOCX, MP4 (Max 10MB)</p>
                   </div>
                 )}
               </div>
@@ -265,7 +283,7 @@ export default function DashboardPage() {
               )}
 
               {file && !uploading && !error && (
-                <Button className="w-full mt-6 h-12 text-lg" onClick={simulateUpload}>
+                <Button className="w-full mt-6 h-12 text-lg" onClick={handleUpload}>
                   Upload and Create Project
                 </Button>
               )}
@@ -273,7 +291,7 @@ export default function DashboardPage() {
               {uploading && (
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-between text-sm font-medium">
-                    <span className="flex items-center gap-2"><Upload className="w-4 h-4 animate-bounce" /> Uploading...</span>
+                    <span className="flex items-center gap-2"><Upload className="w-4 h-4 animate-bounce" /> Uploading to Storage...</span>
                     <span>{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />

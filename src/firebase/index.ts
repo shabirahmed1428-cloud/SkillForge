@@ -5,6 +5,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
+import { getStorage } from 'firebase/storage';
 
 /**
  * Initializes Firebase and returns the core SDK instances.
@@ -17,7 +18,8 @@ export function initializeFirebase() {
     firebaseApp,
     auth: getAuth(firebaseApp),
     firestore: getFirestore(firebaseApp),
-    database: getDatabase(firebaseApp)
+    database: getDatabase(firebaseApp),
+    storage: getStorage(firebaseApp)
   };
 }
 

@@ -4,6 +4,7 @@ import React, { DependencyList, createContext, useContext, ReactNode, useMemo, u
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Database } from 'firebase/database';
+import { FirebaseStorage } from 'firebase/storage';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
@@ -13,6 +14,7 @@ interface FirebaseProviderProps {
   firestore: Firestore;
   auth: Auth;
   database: Database;
+  storage: FirebaseStorage;
 }
 
 // Internal state for user authentication
@@ -28,6 +30,7 @@ export interface FirebaseContextState {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   database: Database | null;
+  storage: FirebaseStorage | null;
   auth: Auth | null; // The Auth service instance
   // User authentication state
   user: User | null;
@@ -40,6 +43,7 @@ export interface FirebaseServicesAndUser {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   database: Database;
+  storage: FirebaseStorage;
   auth: Auth;
   user: User | null;
   isUserLoading: boolean;
@@ -64,7 +68,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firebaseApp,
   firestore,
   auth,
-  database
+  database,
+  storage
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
@@ -96,18 +101,19 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth && database);
+    const servicesAvailable = !!(firebaseApp && firestore && auth && database && storage);
     return {
       areServicesAvailable: servicesAvailable,
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       database: servicesAvailable ? database : null,
+      storage: servicesAvailable ? storage : null,
       auth: servicesAvailable ? auth : null,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
-  }, [firebaseApp, firestore, auth, database, userAuthState]);
+  }, [firebaseApp, firestore, auth, database, storage, userAuthState]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -128,7 +134,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.database) {
+  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.database || !context.storage) {
     throw new Error('Firebase core services not available. Check FirebaseProvider props.');
   }
 
@@ -136,6 +142,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
     database: context.database,
+    storage: context.storage,
     auth: context.auth,
     user: context.user,
     isUserLoading: context.isUserLoading,
@@ -159,6 +166,12 @@ export const useFirestore = (): Firestore => {
 export const useDatabase = (): Database => {
   const { database } = useFirebase();
   return database;
+};
+
+/** Hook to access Firebase Storage instance. */
+export const useStorage = () => {
+  const { storage } = useFirebase();
+  return storage;
 };
 
 /** Hook to access Firebase App instance. */
