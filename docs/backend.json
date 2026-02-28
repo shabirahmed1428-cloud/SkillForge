@@ -1,0 +1,502 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user account in SkillForge, including their profile information, role, storage usage, and subscription plan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The display name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user within the platform (student, mentor, admin). This is often managed via an external authentication system's custom claims, but duplicated here for data modeling purposes.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL to the user's profile picture.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        },
+        "isBanned": {
+          "type": "boolean",
+          "description": "Flag indicating if the user is currently banned from the platform."
+        },
+        "storageUsedMB": {
+          "type": "number",
+          "description": "The amount of storage (in megabytes) currently used by the user for their projects and files."
+        },
+        "storageLimitMB": {
+          "type": "number",
+          "description": "The maximum amount of storage (in megabytes) allowed for the user based on their subscription plan."
+        },
+        "subscriptionPlanId": {
+          "type": "string",
+          "description": "Reference to the Plan entity that details the user's current subscription plan. (Relationship: Plan 1:N User)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "role",
+        "createdAt",
+        "isBanned",
+        "storageUsedMB",
+        "storageLimitMB",
+        "subscriptionPlanId"
+      ]
+    },
+    "Project": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Project",
+      "type": "object",
+      "description": "Represents a project created by a user, including its details, associated files, and visibility settings.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Project entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the project."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the project."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to the User who owns and created the project. (Relationship: User 1:N Project)"
+        },
+        "visibility": {
+          "type": "string",
+          "description": "The visibility setting for the project (e.g., 'public', 'private', 'team')."
+        },
+        "teamId": {
+          "type": "string",
+          "description": "Optional reference to the Team entity if the project's visibility is set to 'team'. (Relationship: Team 1:N Project)"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the project (e.g., 'draft', 'submitted', 'approved')."
+        },
+        "tags": {
+          "type": "array",
+          "description": "An array of keywords or tags for categorizing the project.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the project was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the project was last updated.",
+          "format": "date-time"
+        },
+        "likesCount": {
+          "type": "number",
+          "description": "The number of likes the project has received."
+        },
+        "viewsCount": {
+          "type": "number",
+          "description": "The number of times the project has been viewed."
+        },
+        "fileURL": {
+          "type": "string",
+          "description": "The URL to the primary project file stored in the file hosting system.",
+          "format": "uri"
+        },
+        "fileSizeMB": {
+          "type": "number",
+          "description": "The size of the primary project file in megabytes."
+        },
+        "shareKey": {
+          "type": "string",
+          "description": "A unique, crypto-random string used to securely share the project with external users without requiring login."
+        },
+        "shareKeyEnabled": {
+          "type": "boolean",
+          "description": "A flag indicating whether the secure share key is currently active for this project."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "ownerId",
+        "visibility",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "likesCount",
+        "viewsCount",
+        "fileURL",
+        "fileSizeMB",
+        "shareKey",
+        "shareKeyEnabled"
+      ]
+    },
+    "Team": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Team",
+      "type": "object",
+      "description": "Represents a collaborative team of users for shared projects.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Team entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the team."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to the User who created and owns the team. (Relationship: User 1:N Team)"
+        },
+        "memberIds": {
+          "type": "array",
+          "description": "An array of User IDs who are members of this team. (Relationship: User N:N Team)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "ownerId",
+        "memberIds"
+      ]
+    },
+    "Submission": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Submission",
+      "type": "object",
+      "description": "Represents a project submitted by a student to a mentor for review and feedback.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Submission entity."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to the Project entity that is being submitted. (Relationship: Project 1:N Submission)"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to the User (student) who made the submission. (Relationship: User 1:N Submission)"
+        },
+        "mentorId": {
+          "type": "string",
+          "description": "Reference to the User (mentor) assigned to review this submission. (Relationship: User 1:N Submission)"
+        },
+        "feedback": {
+          "type": "string",
+          "description": "Textual feedback provided by the mentor for the submitted project."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the submission (e.g., 'pending', 'approved', 'rejected')."
+        },
+        "submittedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the project was submitted.",
+          "format": "date-time"
+        },
+        "reviewedAt": {
+          "type": "string",
+          "description": "Optional timestamp indicating when the submission was reviewed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "studentId",
+        "mentorId",
+        "feedback",
+        "status",
+        "submittedAt"
+      ]
+    },
+    "Report": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Report",
+      "type": "object",
+      "description": "Represents a report filed by a user against a project, typically for inappropriate content or violations.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Report entity."
+        },
+        "reportedById": {
+          "type": "string",
+          "description": "Reference to the User who filed the report. (Relationship: User 1:N Report)"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to the Project entity that is being reported. (Relationship: Project 1:N Report)"
+        },
+        "reason": {
+          "type": "string",
+          "description": "The reason provided by the user for reporting the project."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the report (e.g., 'pending', 'resolved', 'dismissed')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the report was created.",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "description": "Optional timestamp indicating when the report was resolved by an administrator.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "reportedById",
+        "projectId",
+        "reason",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Plan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Plan",
+      "type": "object",
+      "description": "Defines the different subscription plans available on SkillForge, detailing their features like storage limits and pricing.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Plan entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the subscription plan (e.g., 'Free', 'Pro', 'Business')."
+        },
+        "storageLimitMB": {
+          "type": "number",
+          "description": "The maximum storage capacity (in megabytes) provided by this plan."
+        },
+        "pricePKR": {
+          "type": "number",
+          "description": "The price of the subscription plan in Pakistani Rupees (PKR)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "storageLimitMB",
+        "pricePKR"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles, roles, and storage statistics. This data is primarily private to the user, with administrative read access. The 'role' field is for data modeling purposes; actual authorization roles are derived from Firebase Custom Claims and/or the '/roles_admin/{userId}' collection. Includes denormalized 'storageUsedMB' and 'storageLimitMB' for quick quota checks. For performance, could also include a 'memberOfTeams: {teamId: true}' map for quick lookup of teams a user belongs to.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user, matching 'request.auth.uid'."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "A dedicated collection for Database Access Control (DBAC) to identify administrators. The mere existence of a document at this path for a given userId indicates admin privileges for Firestore rules. Documents here are minimal, possibly just a timestamp, to signify the admin role. This supports 'Existence over Content' for global roles.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of an administrator user, matching 'request.auth.uid'."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/projects_public/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores Project entities explicitly marked with 'visibility: public'. Documents in this collection are readable by any authenticated user. Write access is restricted to the project's owner. Includes denormalized 'ownerId' for write access control.",
+          "params": [
+            {
+              "name": "projectId",
+              "description": "The unique ID of the public project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores Project entities belonging to a specific user, primarily those with 'visibility: private'. Access to these projects (read/write) is strictly limited to the 'userId' in the path, who is also the project's owner. Includes denormalized 'ownerId' (matching path 'userId') for explicit ownership and robust security rules.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the project owner, matching 'request.auth.uid'."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the private project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/teams/{teamId}",
+        "definition": {
+          "entityName": "Team",
+          "schema": {
+            "$ref": "#/backend/entities/Team"
+          },
+          "description": "Stores information about collaborative teams. The 'memberIds' array is recommended to be internally transformed into a 'members: { [uid]: 'role' }' map for consistent, membership-based access control. This 'members' map would then be denormalized into subcollections for Authorization Independence. The 'ownerId' from the schema will be represented as a member with 'admin' role in the 'members' map.",
+          "params": [
+            {
+              "name": "teamId",
+              "description": "The unique ID of the team."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/teams/{teamId}/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores Project entities with 'visibility: team' that are associated with a specific team. Access (read/write) is restricted to members of the parent team. This requires denormalization of the parent team's 'members' map (e.g., as 'projectTeamMembers: { [uid]: 'role' }') into each project document to ensure Authorization Independence (avoiding 'get()' calls to the parent 'Team' document).",
+          "params": [
+            {
+              "name": "teamId",
+              "description": "The unique ID of the parent team."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the team project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/submissions/{submissionId}",
+        "definition": {
+          "entityName": "Submission",
+          "schema": {
+            "$ref": "#/backend/entities/Submission"
+          },
+          "description": "Records project submissions from students to mentors. Includes denormalized 'studentId' and 'mentorId' for direct access control. Rules can allow students to create/read their own submissions and mentors to read/update submissions assigned to them without 'get()' calls.",
+          "params": [
+            {
+              "name": "submissionId",
+              "description": "The unique ID of the submission."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/reports/{reportId}",
+        "definition": {
+          "entityName": "Report",
+          "schema": {
+            "$ref": "#/backend/entities/Report"
+          },
+          "description": "Stores reports filed by users against projects. Includes denormalized 'reportedById' and 'projectId' for direct access control. Rules can allow the reporter to read their own report and admins to read/update any report.",
+          "params": [
+            {
+              "name": "reportId",
+              "description": "The unique ID of the report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/plans/{planId}",
+        "definition": {
+          "entityName": "Plan",
+          "schema": {
+            "$ref": "#/backend/entities/Plan"
+          },
+          "description": "Defines available subscription plans and their features (e.g., storage limits, pricing). This collection is publicly readable to allow users to view and compare plans.",
+          "params": [
+            {
+              "name": "planId",
+              "description": "The unique ID of the subscription plan."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/share_keys/{shareKeyId}",
+        "definition": {
+          "entityName": "ShareKeyInfo",
+          "schema": {
+            "$ref": "#/backend/entities/ShareKeyInfo"
+          },
+          "description": "Maps a secure, crypto-random share key to its corresponding project and its Firestore path. This collection serves as a lookup table for Cloud Functions to securely validate keys and retrieve project details for anonymous access, ensuring efficient lookup regardless of where the actual project document resides. The 'id' of the document is the 'shareKey' itself.",
+          "params": [
+            {
+              "name": "shareKeyId",
+              "description": "The unique, crypto-random share key string."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure for SkillForge prioritizes security, scalability, and debuggability by strictly adhering to the core design principles. The most critical aspect is achieving Authorization Independence and enabling Query-Approved Permissions (QAPs) through structural segregation and strategic denormalization.\n\n**Authorization Independence & Denormalization:**\n\n1.  **Project Access:** For `Project` entities, which can have 'public', 'private', or 'team' visibility, a single collection would violate the 'Structural Segregation' mandate. Therefore, projects are divided into three distinct collection paths based on their primary access patterns:\n    *   `/projects_public/{projectId}`: For projects intended to be readable by anyone. These documents include `ownerId` for write access control.\n    *   `/users/{userId}/projects/{projectId}`: For projects that are 'private' to a specific user. The `userId` in the path provides strong, path-based ownership. Each project document includes `ownerId` (which matches the `userId` from the path) for explicit ownership.\n    *   `/teams/{teamId}/projects/{projectId}`: For projects with 'team' visibility. These projects are structured as a subcollection under their respective `Team` documents. To ensure **Authorization Independence (CRITICAL)**, each `Project` document in this subcollection *must* denormalize the `members` map (e.g., as `projectTeamMembers: { [uid]: 'role' }`) from its parent `teams/{teamId}` document. This eliminates the need for `get()` calls to the parent `Team` document within security rules when checking `team` access, allowing for atomic operations and simplified rule debugging.\n2.  **Team Membership:** The `Team` entity itself (`/teams/{teamId}`) is recommended to store its members in a `members: { [uid]: 'role' }` map rather than an array of IDs. This 'Membership Map' standardizes authorization checks and makes rule writing more straightforward, aligning with the 'Collaborative Data' access modeling strategy. This `members` map is then denormalized into `team` projects as described above.\n3.  **Submissions & Reports:** Documents in `/submissions/{submissionId}` and `/reports/{reportId}` include denormalized `studentId`, `mentorId`, `reportedById`, and `projectId` fields respectively. This allows for direct access checks (`request.auth.uid == resource.data.studentId`) without requiring `get()` calls to related `User` or `Project` documents.\n\n**QAPs (Rules are not Filters):**\n\nThe structural segregation of `Project` entities directly enables robust QAPs:\n\n1.  **Public Projects:** `list` operations on `/projects_public` can be allowed for any authenticated user, as the collection's security posture is homogeneous (all documents are publicly readable). Rules can simply check `allow list: if request.auth != null;` (or `true` if fully public).\n2.  **Private Projects:** `list` operations on `/users/{userId}/projects` are naturally secured by the path. Rules can allow `list` only if `request.auth.uid == userId`, ensuring users only query their own private projects.\n3.  **Team Projects:** `list` operations on `/teams/{teamId}/projects` are secured by checking the `request.auth.uid` against the `teamMembers` map denormalized within each project document. This allows team members to list projects within *their* specific teams without performing complex filters or `get()` calls to a parent `Team` document.\n4.  **Share Keys:** The `/share_keys/{shareKeyId}` collection is introduced to store a mapping from a unique share key to its corresponding project's Firestore path. This allows Cloud Functions to perform an efficient, single lookup by `shareKeyId` to retrieve the `projectPath` and `projectId`, regardless of which of the three project collections the project resides in. This decouples `shareKey` validation from the complex Firestore `Project` structure, ensuring the `shareKey` system is efficient and secure while respecting the structural segregation for direct Firestore access.\n\n**DBAC (No Custom Claims in DB for Rules):**\n\nUser roles are managed via Firebase Custom Claims. For database authorization checks (DBAC), a dedicated collection `/roles_admin/{userId}` is used. The existence of a document at this path signifies an 'admin' role, enabling simple and explicit rule checks like `exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))`. This avoids relying on `role` fields stored within the `/users/{userId}` documents for authorization, keeping roles in custom claims as the source of truth for auth logic.\n\nThis design ensures that security rules remain simple, explicit, and easy to debug, minimizing the need for complex `get()` calls or multi-conditional logic within the rules themselves, thereby enhancing both security and performance."
+  }
+}
