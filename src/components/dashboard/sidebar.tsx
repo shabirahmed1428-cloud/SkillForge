@@ -8,14 +8,10 @@ import {
   Briefcase, 
   Users, 
   FileCheck, 
-  Settings, 
-  ShieldAlert,
   LogOut,
-  ChevronRight,
   TrendingUp,
   HardDrive
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +27,9 @@ import {
   SidebarGroupLabel,
   SidebarGroupContent
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 const navItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -40,13 +39,36 @@ const navItems = [
 ];
 
 const adminItems = [
-  { name: 'User Management', href: '/dashboard/admin/users', icon: ShieldAlert },
+  { name: 'User Management', href: '/dashboard/admin/users', icon: TrendingUp },
   { name: 'Storage Analytics', href: '/dashboard/admin/analytics', icon: TrendingUp },
 ];
 
-export function DashboardSidebar({ userRole = 'student', storageUsed = 120, storageLimit = 500 }: { userRole?: string, storageUsed?: number, storageLimit?: number }) {
+interface DashboardSidebarProps {
+  userRole?: string;
+  userName?: string;
+  storageUsed?: number;
+  storageLimit?: number;
+}
+
+export function DashboardSidebar({ 
+  userRole = 'student', 
+  userName = 'User',
+  storageUsed = 0, 
+  storageLimit = 500 
+}: DashboardSidebarProps) {
   const pathname = usePathname();
+  const auth = useAuth();
+  const router = useRouter();
   const usagePercent = (storageUsed / storageLimit) * 100;
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+  };
 
   return (
     <Sidebar variant="sidebar" className="border-r border-sidebar-border">
@@ -115,13 +137,13 @@ export function DashboardSidebar({ userRole = 'student', storageUsed = 120, stor
           
           <div className="flex items-center gap-3 py-2 px-1">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">
-              JD
+              {getInitials(userName)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">Jane Doe</p>
+              <p className="text-sm font-semibold truncate">{userName}</p>
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 capitalize">{userRole}</Badge>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={handleLogout}>
               <LogOut className="w-4 h-4" />
             </Button>
           </div>

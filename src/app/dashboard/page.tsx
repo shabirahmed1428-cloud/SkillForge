@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Plus, 
   Upload, 
@@ -22,11 +22,10 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, limit } from 'firebase/firestore';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, query, where, limit, doc } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
@@ -51,6 +50,14 @@ export default function DashboardPage() {
   }, [firestore, user]);
 
   const { data: recentProjects } = useCollection(projectsQuery);
+
+  // Fetch real user profile data for storage info
+  const userDocRef = useMemoFirebase(() => {
+    if (!user?.uid) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user?.uid]);
+
+  const { data: userProfile } = useDoc(userDocRef);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -109,6 +116,10 @@ export default function DashboardPage() {
       });
     }, 100);
   };
+
+  const storageUsed = userProfile?.storageUsedMB || 0;
+  const storageLimit = userProfile?.storageLimitMB || 500;
+  const storageUsagePercent = (storageUsed / storageLimit) * 100;
 
   return (
     <div className="space-y-8">
@@ -212,9 +223,9 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">500 MB</div>
-                <Progress value={24} className="h-1.5 mt-2" />
-                <p className="text-[10px] text-muted-foreground mt-1">120MB used of 500MB limit</p>
+                <div className="text-2xl font-bold">{storageLimit} MB</div>
+                <Progress value={storageUsagePercent} className="h-1.5 mt-2" />
+                <p className="text-[10px] text-muted-foreground mt-1">{storageUsed}MB used of {storageLimit}MB limit</p>
               </CardContent>
             </Card>
             <Card>
