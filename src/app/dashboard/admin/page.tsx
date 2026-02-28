@@ -31,29 +31,40 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { useCollection, useFirestore, useMemoFirebase, useDatabase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDatabase } from '@/firebase';
 import { collection, query, limit } from 'firebase/firestore';
 import { ref, onValue } from 'firebase/database';
+import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const firestore = useFirestore();
   const database = useDatabase();
-  const { user } = useUser();
   const [rtUsersCount, setRtUsersCount] = useState(0);
 
-  // Firestore query for recent users
-  const usersQuery = useMemoFirebase(() => {
+  // Fetch all users to calculate global storage (for MVP, we fetch all; for scale, use aggregation docs)
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'users'));
+  }, [firestore]);
+  const { data: allUsers } = useCollection(allUsersQuery);
+
+  // Fetch all public projects to count them
+  const allProjectsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'projects_public'));
+  }, [firestore]);
+  const { data: allProjects } = useCollection(allProjectsQuery);
+
+  // Firestore query for display table (limited to 10)
+  const recentUsersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'users'), limit(10));
   }, [firestore]);
-
-  const { data: recentUsers, isLoading: usersLoading } = useCollection(usersQuery);
+  const { data: recentUsers, isLoading: usersLoading } = useCollection(recentUsersQuery);
 
   // Realtime Database connection for live monitoring
   useEffect(() => {
     if (!database) return;
-    
-    // Monitor the users path in Realtime Database
     const usersRef = ref(database, 'users');
     const unsubscribe = onValue(usersRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -61,9 +72,15 @@ export default function AdminDashboardPage() {
         setRtUsersCount(Object.keys(data).length);
       }
     });
-
     return () => unsubscribe();
   }, [database]);
+
+  // Calculations
+  const totalStorageUsedMB = allUsers?.reduce((acc, u) => acc + (u.storageUsedMB || 0), 0) || 0;
+  const storageValue = totalStorageUsedMB > 1024 
+    ? `${(totalStorageUsedMB / 1024).toFixed(2)} GB` 
+    : `${totalStorageUsedMB.toFixed(2)} MB`;
+  const activeProjectsCount = allProjects?.length || 0;
 
   const stats = [
     { 
@@ -76,7 +93,7 @@ export default function AdminDashboardPage() {
     },
     { 
       title: "Storage Used", 
-      value: "842.5 GB", 
+      value: storageValue, 
       change: "+4.2%", 
       trend: "up", 
       icon: HardDrive,
@@ -84,9 +101,9 @@ export default function AdminDashboardPage() {
     },
     { 
       title: "Active Projects", 
-      value: "452", 
-      change: "-2.1%", 
-      trend: "down", 
+      value: activeProjectsCount.toString(), 
+      change: "+8.1%", 
+      trend: "up", 
       icon: FileText,
       color: "text-green-600"
     },
@@ -232,11 +249,13 @@ export default function AdminDashboardPage() {
               <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Users className="w-4 h-4" /> Export RTDB Snapshots
+              <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                <Link href="/dashboard/admin/analytics">
+                  <TrendingUp className="w-4 h-4" /> Global Analytics
+                </Link>
               </Button>
               <Button variant="outline" className="w-full justify-start gap-2">
-                <TrendingUp className="w-4 h-4" /> Global Analytics
+                <Users className="w-4 h-4" /> Export RTDB Snapshots
               </Button>
               <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:bg-destructive/10">
                 <ShieldCheck className="w-4 h-4" /> Global Maintenance Mode
