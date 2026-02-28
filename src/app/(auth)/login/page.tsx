@@ -3,26 +3,22 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Chrome, Github } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
   Card, 
   CardContent, 
-  CardHeader, 
-  CardTitle,
   CardFooter
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useFirestore, useDatabase, initiateGoogleSignIn } from '@/firebase';
+import { useAuth } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
-  const firestore = useFirestore();
-  const database = useDatabase();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -50,23 +46,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      initiateGoogleSignIn(auth, firestore, database);
-      // We don't await here as it's non-blocking, but we keep loading state for a moment
-      setTimeout(() => setLoading(false), 2000);
-    } catch (error: any) {
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Google Sign In failed",
-        description: error.message || "Could not sign in with Google.",
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-md space-y-8">
@@ -79,25 +58,7 @@ export default function LoginPage() {
           <p className="text-muted-foreground">Enter your credentials to access your dashboard</p>
         </div>
 
-        <Card className="border-none shadow-xl">
-          <CardHeader className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="gap-2" onClick={handleGoogleSignIn} disabled={loading}>
-                <Chrome className="w-4 h-4" /> Google
-              </Button>
-              <Button variant="outline" className="gap-2" disabled={loading}>
-                <Github className="w-4 h-4" /> GitHub
-              </Button>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-              </div>
-            </div>
-          </CardHeader>
+        <Card className="border-none shadow-xl pt-6">
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
