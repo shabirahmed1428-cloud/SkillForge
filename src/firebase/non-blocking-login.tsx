@@ -33,7 +33,7 @@ export function initiateEmailSignIn(authInstance: Auth, email: string, password:
 export function initiateGoogleSignIn(authInstance: Auth, firestore?: Firestore, database?: Database): void {
   const provider = new GoogleAuthProvider();
   
-  // Use signInWithPopup directly as per non-blocking requirements
+  // Use signInWithPopup directly. We catch errors to prevent the "Pending promise" assertion failure.
   signInWithPopup(authInstance, provider).then((result) => {
     const user = result.user;
     
@@ -48,7 +48,7 @@ export function initiateGoogleSignIn(authInstance: Auth, firestore?: Firestore, 
             id: user.uid,
             name: user.displayName || 'Google User',
             email: user.email,
-            role: 'student', // Default role for social login
+            role: 'student', 
             photoURL: user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`,
             createdAt: serverTimestamp(),
             isBanned: false,
@@ -66,11 +66,14 @@ export function initiateGoogleSignIn(authInstance: Auth, firestore?: Firestore, 
       });
     }
   }).catch((error) => {
-    // Suppress common popup cancellation errors to prevent runtime crashes.
-    if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+    // Suppress common popup cancellation and internal promise errors
+    if (
+      error.code === 'auth/cancelled-popup-request' || 
+      error.code === 'auth/popup-closed-by-user' ||
+      error.message?.includes('Pending promise')
+    ) {
       return;
     }
-    // Note: Other errors are handled centrally via onAuthStateChanged if they affect the session,
-    // or you can add specific error reporting here if needed.
+    console.error('Sign-in error:', error);
   });
 }

@@ -30,6 +30,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -50,11 +51,14 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = () => {
+    if (loading) return;
+    setLoading(true);
     try {
-      // Pass firestore and database to initiateGoogleSignIn to ensure profile creation
       initiateGoogleSignIn(auth, firestore, database);
-      // Navigation happens automatically via useEffect in dashboard layout when auth state changes
+      // We don't await here as it's non-blocking, but we keep loading state for a moment
+      setTimeout(() => setLoading(false), 2000);
     } catch (error: any) {
+      setLoading(false);
       toast({
         variant: "destructive",
         title: "Google Sign In failed",
@@ -69,7 +73,7 @@ export default function LoginPage() {
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">SF</div>
-            <span className="font-headline text-2xl font-bold tracking-tight">SkillForge</span>
+            <span className="font-headline text-2xl font-bold tracking-tight text-foreground">SkillForge</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Sign in to your account</h1>
           <p className="text-muted-foreground">Enter your credentials to access your dashboard</p>
@@ -78,10 +82,10 @@ export default function LoginPage() {
         <Card className="border-none shadow-xl">
           <CardHeader className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="gap-2" onClick={handleGoogleSignIn}>
+              <Button variant="outline" className="gap-2" onClick={handleGoogleSignIn} disabled={loading}>
                 <Chrome className="w-4 h-4" /> Google
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" disabled={loading}>
                 <Github className="w-4 h-4" /> GitHub
               </Button>
             </div>
@@ -108,6 +112,7 @@ export default function LoginPage() {
                     required 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -125,13 +130,14 @@ export default function LoginPage() {
                     required 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
               <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign in'}
+                {loading ? 'Processing...' : 'Sign in'}
               </Button>
               <p className="text-sm text-center text-muted-foreground">
                 Don't have an account? <Link href="/register" className="text-primary font-medium hover:underline">Sign up for free</Link>
