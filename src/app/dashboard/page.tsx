@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from 'react';
@@ -10,7 +11,8 @@ import {
   X,
   File,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -23,7 +25,17 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, useDatabase, useStorage, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { 
+  useFirestore, 
+  useUser, 
+  useCollection, 
+  useDoc, 
+  useMemoFirebase, 
+  useDatabase, 
+  useStorage, 
+  setDocumentNonBlocking, 
+  updateDocumentNonBlocking 
+} from '@/firebase';
 import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
 import { ref as dbRef, set, update } from 'firebase/database';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -117,7 +129,6 @@ export default function DashboardPage() {
     setProgress(0);
     
     const projectId = doc(collection(firestore, 'projects_public')).id;
-    const fileExtension = file.name.split('.').pop();
     const fileName = `${Date.now()}_${file.name}`;
     const fileRef = storageRef(storage, `projects/${projectId}/files/${fileName}`);
     
@@ -159,7 +170,7 @@ export default function DashboardPage() {
           shareKeyEnabled: true
         };
 
-        // --- FIRESTORE WRITES (Non-blocking) ---
+        // --- FIRESTORE WRITES ---
         setDocumentNonBlocking(projectRef, {
           ...projectData,
           createdAt: serverTimestamp(),
@@ -208,16 +219,16 @@ export default function DashboardPage() {
   const storageUsagePercent = Math.min((storageUsed / storageLimit) * 100, 100);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage your large projects and share them securely.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage your professional portfolio and secure project sharing.</p>
         </div>
-        <Button className="gap-2 shadow-lg shadow-primary/20" asChild>
+        <Button className="gap-2 shadow-lg shadow-primary/20 h-11" asChild>
           <Link href="/dashboard/projects/new">
             <Plus className="w-4 h-4" />
-            New Project
+            Create Project
           </Link>
         </Button>
       </div>
@@ -226,17 +237,18 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-2 border-dashed border-muted bg-card/50 transition-colors">
             <CardHeader>
-              <CardTitle>Project Upload</CardTitle>
-              <CardDescription>Drag and drop your project assets (Max 10MB per rules)</CardDescription>
+              <CardTitle>Direct Upload</CardTitle>
+              <CardDescription>Instantly add assets to your public portfolio (Max 10MB)</CardDescription>
             </CardHeader>
             <CardContent>
               <div 
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => !uploading && fileInputRef.current?.click()}
                 className={`
-                  relative border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-all
+                  relative border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center transition-all
+                  ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                   ${isDragging ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-muted hover:border-primary/50 hover:bg-primary/5'}
                 `}
               >
@@ -245,6 +257,7 @@ export default function DashboardPage() {
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={handleFileChange}
+                  disabled={uploading}
                 />
                 
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${file ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
@@ -255,43 +268,47 @@ export default function DashboardPage() {
                   <div className="space-y-2 w-full max-w-sm">
                     <p className="font-semibold text-lg truncate px-4">{file.name}</p>
                     <p className="text-sm text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-destructive h-8" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFile(null);
-                      }}
-                    >
-                      <X className="w-4 h-4 mr-1" /> Remove
-                    </Button>
+                    {!uploading && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive h-8" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFile(null);
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-1" /> Remove
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="font-semibold text-lg">Click or drag file to this area to upload</p>
-                    <p className="text-sm text-muted-foreground">Support for PDF, ZIP, DOCX, MP4 (Max 10MB)</p>
+                    <p className="font-semibold text-lg">Click or drag file to upload</p>
+                    <p className="text-sm text-muted-foreground">PDF, ZIP, DOCX, or MP4 supported</p>
                   </div>
                 )}
               </div>
 
               {error && (
-                <div className="mt-4 flex items-center gap-2 text-destructive text-sm bg-destructive/5 p-3 rounded-lg">
+                <div className="mt-4 flex items-center gap-2 text-destructive text-sm bg-destructive/5 p-3 rounded-lg border border-destructive/20">
                   <AlertCircle className="w-4 h-4" />
                   {error}
                 </div>
               )}
 
               {file && !uploading && !error && (
-                <Button className="w-full mt-6 h-12 text-lg" onClick={handleUpload}>
-                  Upload and Create Project
+                <Button className="w-full mt-6 h-12 text-lg shadow-xl shadow-primary/20" onClick={handleUpload}>
+                  Publish Asset to Portfolio
                 </Button>
               )}
 
               {uploading && (
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-between text-sm font-medium">
-                    <span className="flex items-center gap-2"><Upload className="w-4 h-4 animate-bounce" /> Uploading to Storage...</span>
+                    <span className="flex items-center gap-2 text-primary font-bold">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Uploading to Storage...
+                    </span>
                     <span>{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />
@@ -301,32 +318,32 @@ export default function DashboardPage() {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <Card>
+             <Card className="border-none shadow-md">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <HardDrive className="w-4 h-4 text-primary" />
-                  Available Storage
+                  Storage Statistics
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{storageLimit} MB</div>
+                <div className="text-2xl font-bold">{storageLimit} MB Limit</div>
                 <Progress value={storageUsagePercent} className="h-1.5 mt-2" />
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  {storageUsed.toFixed(2)}MB used of {storageLimit}MB limit
+                  {storageUsed.toFixed(2)} MB used of {storageLimit} MB quota
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-none shadow-md">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-primary" />
-                  Security Status
+                  Security Profile
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">Encrypted</div>
+                <div className="text-2xl font-bold">Verified</div>
                 <div className="flex items-center gap-1.5 text-[10px] text-green-600 mt-2 font-medium">
-                  <CheckCircle2 className="w-3 h-3" /> Secure session active
+                  <CheckCircle2 className="w-3 h-3" /> Secure session established
                 </div>
               </CardContent>
             </Card>
@@ -334,24 +351,21 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <Card className="bg-primary text-primary-foreground">
+          <Card className="bg-primary text-primary-foreground border-none shadow-lg">
             <CardHeader>
-              <CardTitle>Share Key Tip</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Share Tip
+              </CardTitle>
               <CardDescription className="text-primary-foreground/80">
-                Share keys are 20-character strings used to grant secure access to private projects.
+                You can always access your projects directly. Use share keys only for external reviews.
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <p>1. Create a project</p>
-              <p>2. Set visibility to Private</p>
-              <p>3. Generate a Share Key</p>
-              <p>4. Send key to your Mentor</p>
-            </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Recent Projects</CardTitle>
+          <Card className="border-none shadow-md overflow-hidden">
+            <CardHeader className="border-b bg-muted/30">
+              <CardTitle className="text-base font-bold">Recent Uploads</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
@@ -359,19 +373,24 @@ export default function DashboardPage() {
                   <Link 
                     key={project.id} 
                     href={`/shared/${project.id}`} 
-                    className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors group"
                   >
-                    <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground">
-                      <FileText className="w-4 h-4" />
+                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                      <FileText className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{project.title}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase">{project.visibility}</p>
+                      <p className="text-sm font-semibold truncate text-foreground">{project.title}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-medium">
+                        Direct Access Enabled
+                      </p>
                     </div>
                   </Link>
                 ))}
                 {(!recentProjects || recentProjects.length === 0) && (
-                  <p className="p-4 text-sm text-muted-foreground text-center">No projects yet.</p>
+                  <div className="p-8 text-center">
+                    <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">No projects found.</p>
+                  </div>
                 )}
               </div>
             </CardContent>
