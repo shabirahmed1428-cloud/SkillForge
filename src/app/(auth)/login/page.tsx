@@ -4,37 +4,48 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Github, Mail, Lock, ArrowRight, Chrome } from 'lucide-react';
+import { Mail, Lock, Chrome, Github } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
   Card, 
   CardContent, 
-  CardDescription, 
-  CardFooter, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const auth = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Firebase Auth logic would go here
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Welcome back!",
         description: "Successfully signed in to your account.",
       });
       router.push('/dashboard');
-    }, 1500);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Sign in failed",
+        description: error.message || "Could not sign in.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -74,7 +85,15 @@ export default function LoginPage() {
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="email" type="email" placeholder="name@company.com" className="pl-10" required />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="name@company.com" 
+                    className="pl-10" 
+                    required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
@@ -84,7 +103,14 @@ export default function LoginPage() {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="password" type="password" className="pl-10" required />
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    className="pl-10" 
+                    required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
               </div>
             </CardContent>

@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ShieldCheck, 
-  Lock, 
   FileText, 
   Download, 
   Calendar, 
@@ -23,32 +22,47 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestore } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function SharedProjectPage() {
   const { key } = useParams();
   const router = useRouter();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [valid, setValid] = useState(false);
+  const [project, setProject] = useState<any>(null);
 
   useEffect(() => {
-    // Simulate backend key validation
-    const timer = setTimeout(() => {
-      if (typeof key === 'string' && key.length >= 20) {
-        setValid(true);
-      } else {
-        setValid(false);
-        toast({
-          variant: "destructive",
-          title: "Access Denied",
-          description: "This share key is invalid or has been revoked."
-        });
-      }
-      setLoading(false);
-    }, 1200);
+    async function validateKey() {
+      if (!key || typeof key !== 'string') return;
+      
+      try {
+        const keyDoc = await getDoc(doc(firestore, 'share_keys', key));
+        if (!keyDoc.exists()) {
+          setProject(null);
+          setLoading(false);
+          return;
+        }
 
-    return () => clearTimeout(timer);
-  }, [key, toast]);
+        const { projectPath } = keyDoc.data();
+        const projectDoc = await getDoc(doc(firestore, projectPath));
+        
+        if (projectDoc.exists()) {
+          setProject(projectDoc.data());
+        } else {
+          setProject(null);
+        }
+      } catch (err) {
+        console.error(err);
+        setProject(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    validateKey();
+  }, [key, firestore]);
 
   if (loading) {
     return (
@@ -61,7 +75,7 @@ export default function SharedProjectPage() {
     );
   }
 
-  if (!valid) {
+  if (!project) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md text-center border-destructive/20 shadow-xl shadow-destructive/5">
@@ -97,16 +111,16 @@ export default function SharedProjectPage() {
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <h1 className="text-4xl font-bold tracking-tight">Enterprise Scale SaaS Architecture</h1>
-                <Badge variant="outline">Private</Badge>
+                <h1 className="text-4xl font-bold tracking-tight">{project.title}</h1>
+                <Badge variant="outline">{project.visibility}</Badge>
               </div>
               <p className="text-lg text-muted-foreground max-w-2xl">
-                A detailed study on scaling cloud-native applications with high availability and disaster recovery patterns.
+                {project.description}
               </p>
             </div>
             <Button className="gap-2 h-12 px-8 shadow-lg shadow-primary/20">
               <Download className="w-4 h-4" />
-              Download Project (42MB)
+              Download Project
             </Button>
           </div>
 
@@ -114,49 +128,28 @@ export default function SharedProjectPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5" /> Owner
+                  <User className="w-3.5 h-3.5" /> Owner ID
                 </CardDescription>
-                <CardTitle className="text-base font-bold">Jane Doe</CardTitle>
+                <CardTitle className="text-sm font-bold truncate">{project.ownerId}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5" /> Uploaded
+                  <Calendar className="w-3.5 h-3.5" /> Status
                 </CardDescription>
-                <CardTitle className="text-base font-bold">Oct 24, 2023</CardTitle>
+                <CardTitle className="text-base font-bold capitalize">{project.status}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" /> Format
+                  <FileText className="w-3.5 h-3.5" /> Views
                 </CardDescription>
-                <CardTitle className="text-base font-bold">ZIP / PDF Documentation</CardTitle>
+                <CardTitle className="text-base font-bold">{project.viewsCount}</CardTitle>
               </CardHeader>
             </Card>
           </div>
-
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle>Detailed Project Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
-              <p>
-                This project covers the implementation of a microservices architecture using modern containerization and orchestration tools. 
-                The primary objective was to ensure zero-downtime deployments and regional failover capabilities.
-              </p>
-              <p>
-                Key technical highlights include:
-              </p>
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Multi-region Kubernetes deployment strategy</li>
-                <li>Distributed tracing with OpenTelemetry</li>
-                <li>Custom ingress controller for specialized traffic routing</li>
-                <li>Automated performance benchmarking suite</li>
-              </ul>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

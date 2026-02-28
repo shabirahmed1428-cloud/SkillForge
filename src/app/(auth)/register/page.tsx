@@ -18,25 +18,55 @@ import {
 } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('student');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulation of registration logic
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      await setDoc(doc(firestore, 'users', user.uid), {
+        id: user.uid,
+        name,
+        email,
+        role,
+        photoURL: `https://picsum.photos/seed/${user.uid}/200/200`,
+        createdAt: serverTimestamp(),
+        isBanned: false,
+        storageUsedMB: 0,
+        storageLimitMB: 500,
+        subscriptionPlanId: 'free'
+      });
+
       toast({
         title: "Account created!",
         description: `Welcome to SkillForge, ${role}.`,
       });
       router.push('/dashboard');
-    }, 1500);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: error.message || "Could not create account.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,7 +78,7 @@ export default function RegisterPage() {
             <span className="font-headline text-2xl font-bold tracking-tight">SkillForge</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
-          <p className="text-muted-foreground">Join the elite community of builders and mentors</p>
+          <p className="text-muted-foreground">Join the community of builders and mentors</p>
         </div>
 
         <Card className="border-none shadow-xl">
@@ -85,21 +115,43 @@ export default function RegisterPage() {
                 <Label htmlFor="name">Full Name</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="name" placeholder="John Doe" className="pl-10" required />
+                  <Input 
+                    id="name" 
+                    placeholder="John Doe" 
+                    className="pl-10" 
+                    required 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="email" type="email" placeholder="name@company.com" className="pl-10" required />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="name@company.com" 
+                    className="pl-10" 
+                    required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="password" type="password" className="pl-10" required />
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    className="pl-10" 
+                    required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
               </div>
             </CardContent>
