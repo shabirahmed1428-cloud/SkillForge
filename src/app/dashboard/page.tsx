@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { 
   Plus, 
   Upload, 
@@ -40,6 +39,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch recent public projects owned by the user
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -51,6 +51,7 @@ export default function DashboardPage() {
 
   const { data: recentProjects } = useCollection(projectsQuery);
 
+  // Fetch real user profile data for storage stats
   const userDocRef = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -106,7 +107,6 @@ export default function DashboardPage() {
           clearInterval(interval);
           setUploading(false);
           
-          // In a real app, this would be a storage upload then firestore update
           toast({
             title: "Upload complete!",
             description: `${file.name} is now part of your portfolio.`
