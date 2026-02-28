@@ -1,9 +1,10 @@
 
+"use client";
+
 import Link from 'next/link';
 import { 
   ArrowRight, 
   ShieldCheck, 
-  Rocket, 
   Users, 
   HardDrive, 
   Globe,
@@ -11,8 +12,11 @@ import {
   Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useUser } from '@/firebase';
 
 export default function LandingPage() {
+  const { user } = useUser();
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* Navigation */}
@@ -26,10 +30,12 @@ export default function LandingPage() {
           <Link href="#how-it-works" className="text-sm font-medium hover:text-primary transition-colors">How it Works</Link>
         </nav>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors hidden sm:block">Log in</Link>
+          {!user && (
+            <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors hidden sm:block">Log in</Link>
+          )}
           <Button asChild className="shadow-md shadow-primary/20">
-            <Link href="/register" className="gap-2">
-              Get Started <ArrowRight className="w-4 h-4" />
+            <Link href={user ? "/dashboard" : "/register"} className="gap-2">
+              {user ? "Dashboard" : "Get Started"} <ArrowRight className="w-4 h-4" />
             </Link>
           </Button>
         </div>
@@ -57,7 +63,7 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
                 <Button size="lg" asChild className="h-14 px-10 text-lg shadow-xl shadow-primary/30">
-                  <Link href="/register">Get Started</Link>
+                  <Link href={user ? "/dashboard" : "/register"}>{user ? "Go to Dashboard" : "Get Started"}</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="h-14 px-10 text-lg bg-white" asChild>
                   <a href="#access-key-section">Enter Access Key</a>
@@ -106,19 +112,7 @@ export default function LandingPage() {
 
         {/* Access Key Section */}
         <section id="access-key-section" className="py-24 px-4 lg:px-12 bg-slate-50 border-y border-border">
-          <div className="max-w-xl mx-auto text-center space-y-6">
-            <Key className="w-12 h-12 text-primary mx-auto" />
-            <h2 className="text-3xl font-bold">Have a Share Key?</h2>
-            <p className="text-muted-foreground">Enter the 20-character secure key provided to you to view a private project.</p>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Enter 20-character key..." 
-                className="flex-1 h-12 px-4 rounded-md border border-input bg-background focus:ring-2 focus:ring-primary outline-none"
-              />
-              <Button size="lg" className="h-12 px-8">Access Project</Button>
-            </div>
-          </div>
+          <AccessKeyForm />
         </section>
       </main>
 
@@ -132,13 +126,46 @@ export default function LandingPage() {
           <div className="flex gap-8">
             <Link href="#" className="hover:text-primary transition-colors">Privacy</Link>
             <Link href="#" className="hover:text-primary transition-colors">Terms</Link>
-            <Link href="/login" className="hover:text-primary transition-colors">Login</Link>
+            {!user && <Link href="/login" className="hover:text-primary transition-colors">Login</Link>}
           </div>
         </div>
       </footer>
     </div>
   );
 }
+
+function AccessKeyForm() {
+  const [key, setKey] = useState('');
+  const router = useRouter();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (key.trim()) {
+      router.push(`/shared/${key.trim()}`);
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto text-center space-y-6">
+      <Key className="w-12 h-12 text-primary mx-auto" />
+      <h2 className="text-3xl font-bold">Have a Share Key?</h2>
+      <p className="text-muted-foreground">Enter the 20-character secure key provided to you to view a private project.</p>
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input 
+          type="text" 
+          placeholder="Enter 20-character key..." 
+          className="flex-1 h-12 px-4 rounded-md border border-input bg-background focus:ring-2 focus:ring-primary outline-none"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+        />
+        <Button type="submit" size="lg" className="h-12 px-8">Access Project</Button>
+      </form>
+    </div>
+  );
+}
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 function FeatureCard({ icon: Icon, title, description }: { icon: any, title: string, description: string }) {
   return (

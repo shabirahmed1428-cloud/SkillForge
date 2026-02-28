@@ -53,7 +53,7 @@ export default function DashboardPage() {
 
   // Fetch real user profile data for storage info
   const userDocRef = useMemoFirebase(() => {
-    if (!user?.uid) return null;
+    if (!user?.uid || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user?.uid]);
 
@@ -117,8 +117,8 @@ export default function DashboardPage() {
     }, 100);
   };
 
-  const storageUsed = userProfile?.storageUsedMB || 0;
-  const storageLimit = userProfile?.storageLimitMB || 500;
+  const storageUsed = userProfile?.storageUsedMB ?? 0;
+  const storageLimit = userProfile?.storageLimitMB ?? 500;
   const storageUsagePercent = (storageUsed / storageLimit) * 100;
 
   return (
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
-                {recentProjects?.length === 0 && (
+                {(!recentProjects || recentProjects.length === 0) && (
                   <p className="p-4 text-sm text-muted-foreground text-center">No projects yet.</p>
                 )}
               </div>
