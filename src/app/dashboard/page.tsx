@@ -356,7 +356,11 @@ export default function DashboardPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {recentProjects?.map(project => (
-                  <Link key={project.id} href={project.shareKey ? `/shared/${project.shareKey}` : '#'} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
+                  <Link 
+                    key={project.id} 
+                    href={`/shared/${project.id}`} 
+                    className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors"
+                  >
                     <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground">
                       <FileText className="w-4 h-4" />
                     </div>

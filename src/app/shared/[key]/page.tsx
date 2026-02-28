@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -22,54 +21,78 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function SharedProjectPage() {
   const { key } = useParams();
   const router = useRouter();
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
 
   useEffect(() => {
-    async function validateKey() {
+    async function validateAndFetchProject() {
       if (!key || typeof key !== 'string') return;
       
       try {
-        const keyDoc = await getDoc(doc(firestore, 'share_keys', key));
-        if (!keyDoc.exists()) {
-          setProject(null);
-          setLoading(false);
-          return;
+        setLoading(true);
+        
+        // 1. Try to fetch as a public project ID
+        const publicProjectDoc = await getDoc(doc(firestore, 'projects_public', key));
+        if (publicProjectDoc.exists()) {
+          const data = publicProjectDoc.data();
+          // If public OR the user is the owner, allow access
+          if (data.visibility === 'public' || (user && data.ownerId === user.uid)) {
+            setProject(data);
+            setLoading(false);
+            return;
+          }
         }
 
-        const { projectPath } = keyDoc.data();
-        const projectDoc = await getDoc(doc(firestore, projectPath));
-        
-        if (projectDoc.exists()) {
-          setProject(projectDoc.data());
-        } else {
-          setProject(null);
+        // 2. Try to fetch as a private project ID if logged in
+        if (user) {
+          const privateProjectDoc = await getDoc(doc(firestore, 'users', user.uid, 'projects', key));
+          if (privateProjectDoc.exists()) {
+            setProject(privateProjectDoc.data());
+            setLoading(false);
+            return;
+          }
         }
+
+        // 3. Try to fetch via Share Key
+        const keyDoc = await getDoc(doc(firestore, 'share_keys', key));
+        if (keyDoc.exists()) {
+          const { projectPath } = keyDoc.data();
+          const sharedProjectDoc = await getDoc(doc(firestore, projectPath));
+          if (sharedProjectDoc.exists()) {
+            setProject(sharedProjectDoc.data());
+            setLoading(false);
+            return;
+          }
+        }
+
+        // If none of the above work
+        setProject(null);
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching project:", err);
         setProject(null);
       } finally {
         setLoading(false);
       }
     }
 
-    validateKey();
-  }, [key, firestore]);
+    validateAndFetchProject();
+  }, [key, firestore, user]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Validating Secure Key...</p>
+          <p className="text-muted-foreground font-medium">Locating Project...</p>
         </div>
       </div>
     );
@@ -83,8 +106,10 @@ export default function SharedProjectPage() {
             <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-8 h-8" />
             </div>
-            <CardTitle className="text-2xl font-bold">Invalid Access Key</CardTitle>
-            <CardDescription>The key you provided does not grant access to any project.</CardDescription>
+            <CardTitle className="text-2xl font-bold">Access Denied</CardTitle>
+            <CardDescription>
+              We couldn't find the project or you don't have permission to view it.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Button className="w-full" onClick={() => router.push('/')}>Return to Home</Button>
@@ -94,6 +119,8 @@ export default function SharedProjectPage() {
     );
   }
 
+  const isOwner = user && project.ownerId === user.uid;
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -102,9 +129,16 @@ export default function SharedProjectPage() {
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1.5 border-green-200">
-            <ShieldCheck className="w-3.5 h-3.5" /> Secure Session
-          </Badge>
+          <div className="flex gap-2">
+            {isOwner && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                Owner View
+              </Badge>
+            )}
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 flex gap-1.5 border-green-200">
+              <ShieldCheck className="w-3.5 h-3.5" /> Secure Session
+            </Badge>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -112,25 +146,31 @@ export default function SharedProjectPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <h1 className="text-4xl font-bold tracking-tight">{project.title}</h1>
-                <Badge variant="outline">{project.visibility}</Badge>
+                <Badge variant="outline" className="capitalize">{project.visibility}</Badge>
               </div>
               <p className="text-lg text-muted-foreground max-w-2xl">
                 {project.description}
               </p>
             </div>
-            <Button className="gap-2 h-12 px-8 shadow-lg shadow-primary/20">
-              <Download className="w-4 h-4" />
-              Download Project
-            </Button>
+            {project.fileURL && (
+              <Button className="gap-2 h-12 px-8 shadow-lg shadow-primary/20" asChild>
+                <a href={project.fileURL} target="_blank" rel="noopener noreferrer">
+                  <Download className="w-4 h-4" />
+                  Download Assets
+                </a>
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5" /> Owner ID
+                  <User className="w-3.5 h-3.5" /> Owner
                 </CardDescription>
-                <CardTitle className="text-sm font-bold truncate">{project.ownerId}</CardTitle>
+                <CardTitle className="text-sm font-bold truncate">
+                  {isOwner ? "You" : project.ownerId}
+                </CardTitle>
               </CardHeader>
             </Card>
             <Card>
@@ -144,9 +184,9 @@ export default function SharedProjectPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" /> Views
+                  <FileText className="w-3.5 h-3.5" /> Size
                 </CardDescription>
-                <CardTitle className="text-base font-bold">{project.viewsCount}</CardTitle>
+                <CardTitle className="text-base font-bold">{project.fileSizeMB || 0} MB</CardTitle>
               </CardHeader>
             </Card>
           </div>
