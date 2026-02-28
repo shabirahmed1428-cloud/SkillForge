@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Bell, Search, PlusCircle, ExternalLink, Key, ChevronRight } from 'lucide-react';
+import { Bell, Search, Key, ChevronRight, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -16,11 +16,25 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export function TopNav() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
   const [accessKey, setAccessKey] = useState('');
+
+  // Fetch real user profile data
+  const userDocRef = useMemoFirebase(() => {
+    if (!user?.uid || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user?.uid, firestore]);
+
+  const { data: userProfile } = useDoc(userDocRef);
 
   const handleAccess = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,11 +42,16 @@ export function TopNav() {
       toast({
         variant: "destructive",
         title: "Invalid Key",
-        description: "Access keys must be 20 characters long."
+        description: "Access keys must be at least 20 characters long."
       });
       return;
     }
     router.push(`/shared/${accessKey}`);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
   };
 
   return (
@@ -75,18 +94,25 @@ export function TopNav() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full overflow-hidden w-8 h-8 p-0 border border-border">
               <img 
-                src="https://picsum.photos/seed/user1/100/100" 
+                src={userProfile?.photoURL || `https://picsum.photos/seed/${user?.uid || '1'}/100/100`} 
                 alt="Avatar" 
                 className="w-full h-full object-cover"
               />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Jane Doe (Student)</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{userProfile?.name || 'User'}</p>
+                <p className="text-xs leading-none text-muted-foreground capitalize">{userProfile?.role || 'member'}</p>
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>Profile Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => router.push('/')}>Log out</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive flex items-center gap-2" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" /> Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

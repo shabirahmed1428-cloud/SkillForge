@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Plus, 
   Upload, 
@@ -23,8 +24,8 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, limit, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useFirestore, useUser, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
@@ -96,6 +97,15 @@ export default function DashboardPage() {
     }
   };
 
+  const generateKey = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 20; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   const simulateUpload = () => {
     if (!file || !user || !firestore) return;
     setUploading(true);
@@ -107,6 +117,46 @@ export default function DashboardPage() {
           clearInterval(interval);
           setUploading(false);
           
+          const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
+          const projectId = doc(collection(firestore, 'projects_public')).id;
+          const shareKey = generateKey();
+          const projectRef = doc(firestore, 'projects_public', projectId);
+
+          const projectData = {
+            id: projectId,
+            title: file.name,
+            description: `Automated project creation from file upload: ${file.name}`,
+            ownerId: user.uid,
+            visibility: 'public',
+            status: 'approved',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            likesCount: 0,
+            viewsCount: 0,
+            fileURL: 'https://placeholder.com/file', // In real app, this would be the Storage URL
+            fileSizeMB: fileSizeMB,
+            shareKey: shareKey,
+            shareKeyEnabled: true
+          };
+
+          // 1. Save Project
+          setDocumentNonBlocking(projectRef, projectData, { merge: true });
+
+          // 2. Save Share Key Mapping
+          setDocumentNonBlocking(doc(firestore, 'share_keys', shareKey), {
+            id: shareKey,
+            projectId: projectId,
+            projectPath: projectRef.path,
+            createdAt: serverTimestamp()
+          }, { merge: true });
+
+          // 3. Update User Storage Usage
+          if (userProfile) {
+            updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+              storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
+            });
+          }
+
           toast({
             title: "Upload complete!",
             description: `${file.name} is now part of your portfolio.`
@@ -228,7 +278,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold">{storageLimit} MB</div>
                 <Progress value={storageUsagePercent} className="h-1.5 mt-2" />
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  {storageUsed}MB used of {storageLimit}MB limit
+                  {storageUsed.toFixed(2)}MB used of {storageLimit}MB limit
                 </p>
               </CardContent>
             </Card>
@@ -272,7 +322,7 @@ export default function DashboardPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {recentProjects?.map(project => (
-                  <Link key={project.id} href={`/shared/${project.shareKey}`} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
+                  <Link key={project.id} href={project.shareKey ? `/shared/${project.shareKey}` : '#'} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
                     <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground">
                       <FileText className="w-4 h-4" />
                     </div>
