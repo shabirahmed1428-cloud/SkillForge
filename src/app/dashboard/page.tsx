@@ -13,7 +13,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Trash2
+  Trash2,
+  DollarSign,
+  Eye,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -24,6 +27,9 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +59,7 @@ import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/
 import { ref as dbRef, set, update, remove } from 'firebase/database';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit as per storage rules
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -69,7 +75,11 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch recent public projects owned by the user
+  // Fast upload options
+  const [visibility, setVisibility] = useState('public');
+  const [price, setPrice] = useState('');
+  const [sellerAccount, setSellerAccount] = useState('');
+
   const projectsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -81,7 +91,6 @@ export default function DashboardPage() {
 
   const { data: recentProjects } = useCollection(projectsQuery);
 
-  // Fetch real user profile data for storage stats
   const userDocRef = useMemoFirebase(() => {
     if (!user?.uid || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -89,35 +98,13 @@ export default function DashboardPage() {
 
   const { data: userProfile } = useDoc(userDocRef);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
   const validateAndSetFile = (selectedFile: File) => {
     setError(null);
     if (selectedFile.size > MAX_FILE_SIZE) {
       setError("File size exceeds 10MB limit.");
-      toast({
-        variant: "destructive",
-        title: "File too large",
-        description: "Your storage rules limit uploads to 10MB."
-      });
       return;
     }
     setFile(selectedFile);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      validateAndSetFile(e.dataTransfer.files[0]);
-    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,142 +113,116 @@ export default function DashboardPage() {
     }
   };
 
-  const generateKey = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 20; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
   const handleUpload = async () => {
-    if (!file || !user || !firestore || !database || !storage) return;
+    if (!file || !user || !firestore || !database || !storage) {
+      toast({
+        variant: "destructive",
+        title: "Configuration error",
+        description: "Firebase services are not ready. Please refresh."
+      });
+      return;
+    }
     
     setUploading(true);
     setProgress(0);
     
-    const projectId = doc(collection(firestore, 'projects_public')).id;
-    const fileName = `${Date.now()}_${file.name}`;
-    const fileRef = storageRef(storage, `projects/${projectId}/files/${fileName}`);
-    
-    // Start storage upload
-    const uploadTask = uploadBytesResumable(fileRef, file);
+    try {
+      const projectId = doc(collection(firestore, 'projects_public')).id;
+      const fileName = `${Date.now()}_${file.name}`;
+      const fRef = storageRef(storage, `projects/${projectId}/files/${fileName}`);
+      
+      const uploadTask = uploadBytesResumable(fRef, file);
 
-    uploadTask.on('state_changed', 
-      (snapshot) => {
-        const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setProgress(Math.round(p));
-      }, 
-      (error) => {
-        setUploading(false);
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: error.message
-        });
-      }, 
-      async () => {
-        // Get URL and finalize data entry
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
-        const shareKey = generateKey();
-        const projectRef = doc(firestore, 'projects_public', projectId);
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setProgress(Math.round(p));
+        }, 
+        (err) => {
+          setUploading(false);
+          setError(err.message);
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: err.message
+          });
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
+          const projectRef = doc(firestore, 'projects_public', projectId);
 
-        const projectData = {
-          id: projectId,
-          title: file.name,
-          description: `Project file: ${file.name}`,
-          ownerId: user.uid,
-          visibility: 'public',
-          status: 'approved',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          price: 0,
-          isForSale: false,
-          fileURL: downloadURL,
-          fileSizeMB: fileSizeMB,
-          shareKey: shareKey,
-          storagePath: `projects/${projectId}/files/${fileName}`
-        };
+          const basePrice = parseFloat(price) || 0;
 
-        // Batch writes for speed and reliability (Firestore)
-        setDocumentNonBlocking(projectRef, {
-          ...projectData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+          const projectData = {
+            id: projectId,
+            title: file.name,
+            description: `Project file: ${file.name}`,
+            ownerId: user.uid,
+            visibility: visibility,
+            status: 'approved',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            price: visibility === 'public' ? basePrice : 0,
+            isForSale: visibility === 'public' && basePrice > 0,
+            sellerAccount: sellerAccount,
+            fileURL: downloadURL,
+            fileSizeMB: fileSizeMB,
+            storagePath: `projects/${projectId}/files/${fileName}`
+          };
 
-        // User storage increment
-        if (userProfile) {
-          const newUsage = (userProfile.storageUsedMB || 0) + fileSizeMB;
-          updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-            storageUsedMB: newUsage
+          setDocumentNonBlocking(projectRef, projectData, { merge: true });
+
+          if (userProfile) {
+            const newUsage = (userProfile.storageUsedMB || 0) + fileSizeMB;
+            updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+              storageUsedMB: newUsage
+            });
+            update(dbRef(database, `users/${user.uid}`), {
+              storageUsedMB: newUsage
+            });
+          }
+
+          set(dbRef(database, `projects/${projectId}`), {
+            ...projectData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+
+          toast({
+            title: "Project published!",
+            description: `${file.name} is now live.`
           });
           
-          // Parallel update in RTDB for redundancy/real-time tracking
-          update(dbRef(database, `users/${user.uid}`), {
-            storageUsedMB: newUsage
-          });
+          setUploading(false);
+          setFile(null);
+          setPrice('');
+          setSellerAccount('');
+          setProgress(0);
         }
-
-        // Realtime Database replication for "Fast" retrieval
-        set(dbRef(database, `projects/${projectId}`), {
-          ...projectData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-
-        toast({
-          title: "Project published!",
-          description: `${file.name} is now live in your portfolio.`
-        });
-        
-        setUploading(false);
-        setFile(null);
-        setProgress(0);
-      }
-    );
+      );
+    } catch (err: any) {
+      setUploading(false);
+      setError(err.message);
+    }
   };
 
   const handleDeleteProject = async (projectId: string, fileSizeMB: number, storagePath?: string) => {
-    if (!firestore || !user || !database) return;
-
+    if (!firestore || !user || !database || !storage) return;
     try {
-      // 1. Delete from Storage if path exists
-      if (storage && storagePath) {
-        const fileRef = storageRef(storage, storagePath);
-        deleteObject(fileRef).catch(e => console.warn("Storage deletion failed", e));
+      if (storagePath) {
+        deleteObject(storageRef(storage, storagePath)).catch(() => {});
       }
-
-      // 2. Delete from Firestore (Non-blocking for UI speed)
-      const projectRef = doc(firestore, 'projects_public', projectId);
-      deleteDocumentNonBlocking(projectRef);
-
-      // 3. Delete from Realtime Database
+      deleteDocumentNonBlocking(doc(firestore, 'projects_public', projectId));
       remove(dbRef(database, `projects/${projectId}`));
-
-      // 4. Update storage usage (Snap to local calculation for speed)
       if (userProfile) {
         const newUsage = Math.max(0, (userProfile.storageUsedMB || 0) - (fileSizeMB || 0));
-        updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-          storageUsedMB: newUsage
-        });
-        update(dbRef(database, `users/${user.uid}`), {
-          storageUsedMB: newUsage
-        });
+        updateDocumentNonBlocking(doc(firestore, 'users', user.uid), { storageUsedMB: newUsage });
+        update(dbRef(database, `users/${user.uid}`), { storageUsedMB: newUsage });
       }
-
-      toast({
-        title: "Project deleted",
-        description: "Project has been removed from your portfolio."
-      });
+      toast({ title: "Project deleted" });
     } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Deletion failed",
-        description: e.message
-      });
+      toast({ variant: "destructive", title: "Deletion failed", description: e.message });
     }
   };
 
@@ -274,19 +235,15 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage your professional portfolio and secure project sharing.</p>
+          <p className="text-muted-foreground mt-1">Quick-publish assets and manage your portfolio.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="gap-2" asChild>
-            <Link href="/dashboard/billing">
-              <HardDrive className="w-4 h-4" />
-              Upgrade Storage
-            </Link>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/billing">Upgrade Storage</Link>
           </Button>
-          <Button className="gap-2 shadow-lg shadow-primary/20 h-11" asChild>
+          <Button className="shadow-lg shadow-primary/20" asChild>
             <Link href="/dashboard/projects/new">
-              <Plus className="w-4 h-4" />
-              Create Project
+              <Plus className="w-4 h-4 mr-2" /> New Project
             </Link>
           </Button>
         </div>
@@ -294,188 +251,163 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <Card className="border-2 border-dashed border-muted bg-card/50 transition-colors">
+          <Card className="border-2 border-dashed border-muted bg-card/50">
             <CardHeader>
-              <CardTitle>Direct Upload</CardTitle>
-              <CardDescription>Instantly add assets to your public portfolio (Max 10MB)</CardDescription>
+              <CardTitle>Fast Upload & Store</CardTitle>
+              <CardDescription>Instantly publish files to your portfolio.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <div 
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
                 onClick={() => !uploading && fileInputRef.current?.click()}
                 className={`
-                  relative border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center transition-all
-                  ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  ${isDragging ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-muted hover:border-primary/50 hover:bg-primary/5'}
+                  border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer
+                  ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50 hover:bg-primary/5'}
                 `}
               >
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                />
-                
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${file ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                  {file ? <File className="w-8 h-8" /> : <Upload className="w-8 h-8" />}
+                <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} disabled={uploading} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${file ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                  {file ? <File className="w-6 h-6" /> : <Upload className="w-6 h-6" />}
                 </div>
-
                 {file ? (
-                  <div className="space-y-2 w-full max-w-sm">
-                    <p className="font-semibold text-lg truncate px-4">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                    {!uploading && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-destructive h-8" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFile(null);
-                        }}
-                      >
-                        <X className="w-4 h-4 mr-1" /> Remove
-                      </Button>
-                    )}
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm truncate max-w-[200px]">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="font-semibold text-lg">Click or drag file to upload</p>
-                    <p className="text-sm text-muted-foreground">PDF, ZIP, DOCX, or MP4 supported</p>
-                  </div>
+                  <p className="text-sm font-medium">Click to select asset (Max 10MB)</p>
                 )}
               </div>
 
-              {error && (
-                <div className="mt-4 flex items-center gap-2 text-destructive text-sm bg-destructive/5 p-3 rounded-lg border border-destructive/20">
-                  <AlertCircle className="w-4 h-4" />
-                  {error}
+              {file && !uploading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-4">
+                  <div className="space-y-4">
+                    <Label className="text-xs font-bold uppercase">Visibility</Label>
+                    <RadioGroup defaultValue="public" className="flex gap-4" onValueChange={setVisibility}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="public" id="p-public" />
+                        <Label htmlFor="p-public" className="text-xs cursor-pointer flex items-center gap-1"><Eye className="w-3 h-3" /> Public</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="private" id="p-private" />
+                        <Label htmlFor="p-private" className="text-xs cursor-pointer flex items-center gap-1"><Lock className="w-3 h-3" /> Private</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {visibility === 'public' && (
+                    <div className="space-y-3">
+                      <Label className="text-xs font-bold uppercase">Listing Price (RS)</Label>
+                      <Input 
+                        placeholder="0 for Free" 
+                        type="number" 
+                        className="h-8 text-xs"
+                        value={price}
+                        onChange={e => setPrice(e.target.value)}
+                      />
+                      {parseFloat(price) > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-[10px] text-muted-foreground font-bold uppercase">Payout Account</Label>
+                          <Input 
+                            placeholder="EasyPaisa/Bank ID" 
+                            className="h-8 text-xs"
+                            value={sellerAccount}
+                            onChange={e => setSellerAccount(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="md:col-span-2 pt-2">
+                    <Button className="w-full h-10 shadow-lg shadow-primary/20" onClick={handleUpload}>
+                      Confirm & Publish Asset
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {file && !uploading && !error && (
-                <Button className="w-full mt-6 h-12 text-lg shadow-xl shadow-primary/20" onClick={handleUpload}>
-                  Publish Asset to Portfolio
-                </Button>
-              )}
-
               {uploading && (
-                <div className="mt-6 space-y-4">
-                  <div className="flex justify-between text-sm font-medium">
-                    <span className="flex items-center gap-2 text-primary font-bold">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Uploading to Storage...
-                    </span>
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex justify-between text-xs font-bold text-primary">
+                    <span className="flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</span>
                     <span>{progress}%</span>
                   </div>
-                  <Progress value={progress} className="h-2" />
+                  <Progress value={progress} className="h-1.5" />
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center gap-2 text-destructive text-[10px] bg-destructive/5 p-2 rounded border border-destructive/20">
+                  <AlertCircle className="w-3 h-3" /> {error}
                 </div>
               )}
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <Card className="border-none shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <HardDrive className="w-4 h-4 text-primary" />
-                  Storage Statistics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{storageLimit} MB Limit</div>
-                <Progress value={storageUsagePercent} className="h-1.5 mt-2" />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {storageUsed.toFixed(2)} MB used of {storageLimit} MB quota
-                </p>
-              </CardContent>
-            </Card>
             <Card className="border-none shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary" />
-                  Security Profile
+                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                  <HardDrive className="w-3 h-3 text-primary" /> Storage
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">Verified</div>
-                <div className="flex items-center gap-1.5 text-[10px] text-green-600 mt-2 font-medium">
-                  <CheckCircle2 className="w-3 h-3" /> Secure session established
-                </div>
+                <div className="text-xl font-bold">{storageUsed.toFixed(2)} / {storageLimit} MB</div>
+                <Progress value={storageUsagePercent} className="h-1 mt-2" />
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-md bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                  <ShieldCheck className="w-3 h-3 text-primary" /> Session
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">Encrypted</div>
+                <p className="text-[10px] text-green-600 mt-1 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Live connection active
+                </p>
               </CardContent>
             </Card>
           </div>
         </div>
 
         <div className="space-y-6">
-          <Card className="bg-primary text-primary-foreground border-none shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="w-5 h-5" />
-                Quick Tip
-              </CardTitle>
-              <CardDescription className="text-primary-foreground/80 text-xs">
-                Use private visibility and share keys for confidential work. Public projects appear in the platform marketplace.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
           <Card className="border-none shadow-md overflow-hidden">
-            <CardHeader className="border-b bg-muted/30">
-              <CardTitle className="text-base font-bold">Your Recent Projects</CardTitle>
+            <CardHeader className="bg-muted/30 border-b">
+              <CardTitle className="text-sm font-bold">Recent Portfolio Items</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {recentProjects?.map(project => (
                   <div key={project.id} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors group">
-                    <Link 
-                      href={`/shared/${project.id}`} 
-                      className="flex flex-1 items-center gap-3 min-w-0"
-                    >
-                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate text-foreground">{project.title}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase font-medium">
-                          {project.isForSale ? `Price: RS ${(project.price || 0) * 1.1}` : 'Free Access'}
-                        </p>
-                      </div>
-                    </Link>
-                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate">{project.title}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase mt-0.5">
+                        {project.isForSale ? `RS ${(project.price || 0) * 1.1}` : 'Free'} • {project.visibility}
+                      </p>
+                    </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive transition-colors">
-                          <Trash2 className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently remove "{project.title}" and free up {(project.fileSizeMB || 0).toFixed(2)} MB of storage. This action cannot be undone.
-                          </AlertDialogDescription>
+                          <AlertDialogDescription>This will free up {(project.fileSizeMB || 0).toFixed(2)} MB of storage.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => handleDeleteProject(project.id, project.fileSizeMB || 0, project.storagePath)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDeleteProject(project.id, project.fileSizeMB || 0, project.storagePath)}>Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
                 ))}
                 {(!recentProjects || recentProjects.length === 0) && (
-                  <div className="p-8 text-center">
-                    <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No projects found. Upload a file to get started.</p>
-                  </div>
+                  <div className="p-8 text-center text-muted-foreground text-[10px]">No projects found.</div>
                 )}
               </div>
             </CardContent>
