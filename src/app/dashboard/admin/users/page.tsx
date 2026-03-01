@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -11,7 +10,9 @@ import {
   ArrowLeft,
   Mail,
   Calendar,
-  MoreVertical
+  Ban,
+  CheckCircle,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   Card, 
@@ -46,7 +47,8 @@ import {
   useCollection, 
   useFirestore, 
   useMemoFirebase, 
-  deleteDocumentNonBlocking 
+  deleteDocumentNonBlocking,
+  updateDocumentNonBlocking
 } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import Link from 'next/link';
@@ -78,6 +80,18 @@ export default function UserManagementPage() {
     toast({
       title: "User Record Deleted",
       description: `The account record for ${userName} has been removed from Firestore.`,
+    });
+  };
+
+  const handleToggleBan = (userId: string, currentStatus: boolean, userName: string) => {
+    if (!firestore) return;
+    
+    const userRef = doc(firestore, 'users', userId);
+    updateDocumentNonBlocking(userRef, { isBanned: !currentStatus });
+    
+    toast({
+      title: currentStatus ? "User Unbanned" : "User Banned",
+      description: `${userName}'s access has been ${currentStatus ? 'restored' : 'restricted'}.`,
     });
   };
 
@@ -160,6 +174,16 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={user.isBanned ? "text-green-600 hover:bg-green-50" : "text-orange-600 hover:bg-orange-50"}
+                        onClick={() => handleToggleBan(user.id, user.isBanned, user.name)}
+                        title={user.isBanned ? "Activate User" : "Deactivate User"}
+                      >
+                        {user.isBanned ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                      </Button>
+
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
