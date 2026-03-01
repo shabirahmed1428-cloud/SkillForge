@@ -10,7 +10,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'skillforge@admin.com' || 
-        request.auth.token.email == 'waqasarham381@gmail.com'
+        request.auth.token.email == 'waqasarham381@gmail.com' ||
+        request.auth.uid == 'ln302jZMjsOpeugilElKz60cYMt2'
       );
     }
 
@@ -28,8 +29,12 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow get: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+      // Allow the admin to list all transactions or specific users to see their own
       allow list: if isAdmin();
+      allow get: if isSignedIn() && (
+        isAdmin() || 
+        (resource != null && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid))
+      );
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
