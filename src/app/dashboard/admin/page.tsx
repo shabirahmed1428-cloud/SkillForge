@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -11,7 +12,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Search,
-  Database as DbIcon
+  Database as DbIcon,
+  Settings
 } from 'lucide-react';
 import { 
   Card, 
@@ -41,7 +43,7 @@ export default function AdminDashboardPage() {
   const database = useDatabase();
   const [rtUsersCount, setRtUsersCount] = useState(0);
 
-  // Fetch all users to calculate global storage (for MVP, we fetch all; for scale, use aggregation docs)
+  // Fetch all users to calculate global storage
   const allUsersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'users'));
@@ -55,10 +57,10 @@ export default function AdminDashboardPage() {
   }, [firestore]);
   const { data: allProjects } = useCollection(allProjectsQuery);
 
-  // Firestore query for display table (limited to 10)
+  // Firestore query for display table (limited to 5)
   const recentUsersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'users'), limit(10));
+    return query(collection(firestore, 'users'), limit(5));
   }, [firestore]);
   const { data: recentUsers, isLoading: usersLoading } = useCollection(recentUsersQuery);
 
@@ -125,14 +127,15 @@ export default function AdminDashboardPage() {
           <p className="text-muted-foreground mt-1">Platform-wide oversight connected to Realtime Database & Auth.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3">
-            <DbIcon className="w-3.5 h-3.5 text-primary" />
-            RTDB Connected
+          <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3 border-primary/20 bg-primary/5 text-primary">
+            <DbIcon className="w-3.5 h-3.5" />
+            Live Connected
           </Badge>
-          <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3">
-            <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
-            Auth Verified
-          </Badge>
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/dashboard/admin/users">
+              <Settings className="w-4 h-4" /> Manage All Users
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -162,7 +165,6 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Users Table */}
         <Card className="lg:col-span-2 border-none shadow-md overflow-hidden">
           <CardHeader className="bg-muted/30 border-b">
             <div className="flex items-center justify-between">
@@ -170,10 +172,9 @@ export default function AdminDashboardPage() {
                 <CardTitle className="text-base font-bold">Platform Users</CardTitle>
                 <CardDescription>Latest signups verified via Authentication.</CardDescription>
               </div>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Search users..." className="pl-9 h-9 w-[200px]" />
-              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/dashboard/admin/users" className="text-primary">View All</Link>
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -184,7 +185,6 @@ export default function AdminDashboardPage() {
                   <TableHead>Role</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">{u.role}</Badge>
+                      <Badge variant="secondary" className="capitalize text-[10px] py-0">{u.role}</Badge>
                     </TableCell>
                     <TableCell className="capitalize">{u.subscriptionPlanId}</TableCell>
                     <TableCell>
@@ -205,19 +205,16 @@ export default function AdminDashboardPage() {
                         {u.isBanned ? "Banned" : "Active"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">Manage</Button>
-                    </TableCell>
                   </TableRow>
                 ))}
                 {usersLoading && [1, 2, 3].map((i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={5} className="h-12 animate-pulse bg-muted/20" />
+                    <TableCell colSpan={4} className="h-12 animate-pulse bg-muted/20" />
                   </TableRow>
                 ))}
                 {(!recentUsers || recentUsers.length === 0) && !usersLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No user records found in Firestore.
                     </TableCell>
                   </TableRow>
@@ -227,7 +224,6 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Security / System Alerts */}
         <div className="space-y-6">
           <Card className="border-none shadow-md bg-primary text-primary-foreground">
             <CardHeader>
@@ -240,7 +236,9 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="secondary" className="w-full">View Auth Logs</Button>
+              <Button variant="secondary" className="w-full" asChild>
+                <Link href="/dashboard/admin/users">Open Management Hub</Link>
+              </Button>
             </CardContent>
           </Card>
 
@@ -254,8 +252,10 @@ export default function AdminDashboardPage() {
                   <TrendingUp className="w-4 h-4" /> Global Analytics
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Users className="w-4 h-4" /> Export RTDB Snapshots
+              <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                <Link href="/dashboard/admin/users">
+                  <Users className="w-4 h-4" /> Manage All Users
+                </Link>
               </Button>
               <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:bg-destructive/10">
                 <ShieldCheck className="w-4 h-4" /> Global Maintenance Mode
