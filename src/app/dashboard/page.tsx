@@ -75,7 +75,7 @@ export default function DashboardPage() {
     return query(
       collection(firestore, 'projects_public'),
       where('ownerId', '==', user.uid),
-      limit(5)
+      limit(10)
     );
   }, [firestore, user]);
 
@@ -145,6 +145,7 @@ export default function DashboardPage() {
     const fileName = `${Date.now()}_${file.name}`;
     const fileRef = storageRef(storage, `projects/${projectId}/files/${fileName}`);
     
+    // Start storage upload
     const uploadTask = uploadBytesResumable(fileRef, file);
 
     uploadTask.on('state_changed', 
@@ -161,6 +162,7 @@ export default function DashboardPage() {
         });
       }, 
       async () => {
+        // Get URL and finalize data entry
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
         const shareKey = generateKey();
@@ -175,46 +177,40 @@ export default function DashboardPage() {
           status: 'approved',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          likesCount: 0,
-          viewsCount: 0,
+          price: 0,
+          isForSale: false,
           fileURL: downloadURL,
           fileSizeMB: fileSizeMB,
           shareKey: shareKey,
-          shareKeyEnabled: true,
           storagePath: `projects/${projectId}/files/${fileName}`
         };
 
-        // --- FIRESTORE WRITES ---
+        // Batch writes for speed and reliability (Firestore)
         setDocumentNonBlocking(projectRef, {
           ...projectData,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         }, { merge: true });
 
-        setDocumentNonBlocking(doc(firestore, 'share_keys', shareKey), {
-          id: shareKey,
-          projectId: projectId,
-          projectPath: projectRef.path,
-          createdAt: serverTimestamp()
-        }, { merge: true });
-
+        // User storage increment
         if (userProfile) {
+          const newUsage = (userProfile.storageUsedMB || 0) + fileSizeMB;
           updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-            storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
+            storageUsedMB: newUsage
+          });
+          
+          // Parallel update in RTDB for redundancy/real-time tracking
+          update(dbRef(database, `users/${user.uid}`), {
+            storageUsedMB: newUsage
           });
         }
 
-        // --- REALTIME DATABASE WRITES ---
-        set(dbRef(database, `projects/${projectId}`), projectData);
-        set(dbRef(database, `share_keys/${shareKey}`), {
-          projectId: projectId,
-          createdAt: projectData.createdAt
+        // Realtime Database replication for "Fast" retrieval
+        set(dbRef(database, `projects/${projectId}`), {
+          ...projectData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
-        if (userProfile) {
-          update(dbRef(database, `users/${user.uid}`), {
-            storageUsedMB: (userProfile.storageUsedMB || 0) + fileSizeMB
-          });
-        }
 
         toast({
           title: "Project published!",
@@ -238,14 +234,14 @@ export default function DashboardPage() {
         deleteObject(fileRef).catch(e => console.warn("Storage deletion failed", e));
       }
 
-      // 2. Delete from Firestore
+      // 2. Delete from Firestore (Non-blocking for UI speed)
       const projectRef = doc(firestore, 'projects_public', projectId);
       deleteDocumentNonBlocking(projectRef);
 
       // 3. Delete from Realtime Database
       remove(dbRef(database, `projects/${projectId}`));
 
-      // 4. Update storage usage
+      // 4. Update storage usage (Snap to local calculation for speed)
       if (userProfile) {
         const newUsage = Math.max(0, (userProfile.storageUsedMB || 0) - (fileSizeMB || 0));
         updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
@@ -280,12 +276,20 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage your professional portfolio and secure project sharing.</p>
         </div>
-        <Button className="gap-2 shadow-lg shadow-primary/20 h-11" asChild>
-          <Link href="/dashboard/projects/new">
-            <Plus className="w-4 h-4" />
-            Create Project
-          </Link>
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" className="gap-2" asChild>
+            <Link href="/dashboard/billing">
+              <HardDrive className="w-4 h-4" />
+              Upgrade Storage
+            </Link>
+          </Button>
+          <Button className="gap-2 shadow-lg shadow-primary/20 h-11" asChild>
+            <Link href="/dashboard/projects/new">
+              <Plus className="w-4 h-4" />
+              Create Project
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -408,19 +412,19 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <Card className="bg-primary text-primary-foreground border-none shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <FileText className="w-5 h-5" />
-                Share Tip
+                Quick Tip
               </CardTitle>
-              <CardDescription className="text-primary-foreground/80">
-                You can always access your projects directly. Use share keys only for external reviews.
+              <CardDescription className="text-primary-foreground/80 text-xs">
+                Use private visibility and share keys for confidential work. Public projects appear in the platform marketplace.
               </CardDescription>
             </CardHeader>
           </Card>
 
           <Card className="border-none shadow-md overflow-hidden">
             <CardHeader className="border-b bg-muted/30">
-              <CardTitle className="text-base font-bold">Recent Uploads</CardTitle>
+              <CardTitle className="text-base font-bold">Your Recent Projects</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
@@ -436,7 +440,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate text-foreground">{project.title}</p>
                         <p className="text-[10px] text-muted-foreground uppercase font-medium">
-                          Direct Access Enabled
+                          {project.isForSale ? `Price: RS ${(project.price || 0) * 1.1}` : 'Free Access'}
                         </p>
                       </div>
                     </Link>
@@ -451,7 +455,7 @@ export default function DashboardPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Project?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will permanently remove "{project.title}" and free up {(project.fileSizeMB || 0).toFixed(2)} MB of storage.
+                            This will permanently remove "{project.title}" and free up {(project.fileSizeMB || 0).toFixed(2)} MB of storage. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -470,7 +474,7 @@ export default function DashboardPage() {
                 {(!recentProjects || recentProjects.length === 0) && (
                   <div className="p-8 text-center">
                     <FileText className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No projects found.</p>
+                    <p className="text-xs text-muted-foreground">No projects found. Upload a file to get started.</p>
                   </div>
                 )}
               </div>
