@@ -13,7 +13,11 @@ import {
   ArrowDownRight,
   Search,
   Database as DbIcon,
-  Settings
+  Settings,
+  Clock,
+  CheckCircle,
+  XCircle,
+  CreditCard
 } from 'lucide-react';
 import { 
   Card, 
@@ -33,14 +37,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { useCollection, useFirestore, useMemoFirebase, useDatabase } from '@/firebase';
-import { collection, query, limit } from 'firebase/firestore';
-import { ref, onValue } from 'firebase/database';
+import { 
+  useCollection, 
+  useFirestore, 
+  useMemoFirebase, 
+  useDatabase,
+  updateDocumentNonBlocking 
+} from '@/firebase';
+import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, onValue, update } from 'firebase/database';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminDashboardPage() {
   const firestore = useFirestore();
   const database = useDatabase();
+  const { toast } = useToast();
   const [rtUsersCount, setRtUsersCount] = useState(0);
 
   // Fetch all users to calculate global storage
@@ -57,7 +69,17 @@ export default function AdminDashboardPage() {
   }, [firestore]);
   const { data: allProjects } = useCollection(allProjectsQuery);
 
-  // Firestore query for display table (limited to 5)
+  // Query for pending subscription approvals
+  const pendingApprovalsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'users'), 
+      where('subscriptionStatus', '==', 'pending_approval')
+    );
+  }, [firestore]);
+  const { data: pendingUsers, isLoading: pendingLoading } = useCollection(pendingApprovalsQuery);
+
+  // Firestore query for recent signups
   const recentUsersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'users'), limit(5));
@@ -76,6 +98,49 @@ export default function AdminDashboardPage() {
     });
     return () => unsubscribe();
   }, [database]);
+
+  const handleApproveSubscription = (userId: string, userName: string) => {
+    if (!firestore || !database) return;
+
+    const userRef = doc(firestore, 'users', userId);
+    const updateData = {
+      subscriptionStatus: 'active',
+      subscriptionPlanId: 'pro',
+      storageLimitMB: 2048, // 2GB
+      updatedAt: serverTimestamp()
+    };
+
+    // 1. Update Firestore
+    updateDocumentNonBlocking(userRef, updateData);
+
+    // 2. Update Realtime Database
+    update(ref(database, `users/${userId}`), {
+      subscriptionStatus: 'active',
+      storageLimitMB: 2048
+    });
+
+    toast({
+      title: "Subscription Approved",
+      description: `${userName} has been upgraded to Pro (2GB).`,
+    });
+  };
+
+  const handleRejectSubscription = (userId: string, userName: string) => {
+    if (!firestore || !database) return;
+
+    const userRef = doc(firestore, 'users', userId);
+    updateDocumentNonBlocking(userRef, {
+      subscriptionStatus: 'none',
+      lastPaymentTransactionId: null,
+      updatedAt: serverTimestamp()
+    });
+
+    toast({
+      variant: "destructive",
+      title: "Request Rejected",
+      description: `Upgrade request for ${userName} has been dismissed.`,
+    });
+  };
 
   // Calculations
   const totalStorageUsedMB = allUsers?.reduce((acc, u) => acc + (u.storageUsedMB || 0), 0) || 0;
@@ -163,6 +228,88 @@ export default function AdminDashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Pending Approvals Section */}
+      <Card className="border-none shadow-md border-t-4 border-t-orange-500 overflow-hidden">
+        <CardHeader className="bg-orange-50/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Clock className="w-4 h-4 text-orange-500" />
+                Pending Upgrade Requests
+              </CardTitle>
+              <CardDescription>Review Transaction IDs from EasyPaisa and approve storage upgrades.</CardDescription>
+            </div>
+            <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+              {pendingUsers?.length || 0} Request{(pendingUsers?.length !== 1) ? 's' : ''}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Transaction ID</TableHead>
+                <TableHead>Current Limit</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendingUsers?.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm">{u.name}</span>
+                      <span className="text-xs text-muted-foreground">{u.email}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <code className="bg-muted px-2 py-1 rounded text-xs font-mono border">
+                      {u.lastPaymentTransactionId || 'N/A'}
+                    </code>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {u.storageLimitMB}MB
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 text-destructive hover:bg-destructive/10"
+                        onClick={() => handleRejectSubscription(u.id, u.name)}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleApproveSubscription(u.id, u.name)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" /> Approve Pro
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {pendingLoading && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-12 animate-pulse bg-muted/20" />
+                </TableRow>
+              )}
+              {(!pendingUsers || pendingUsers.length === 0) && !pendingLoading && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                    <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    No pending payment approvals at this time.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 border-none shadow-md overflow-hidden">
