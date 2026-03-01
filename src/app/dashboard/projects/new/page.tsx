@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -7,9 +6,7 @@ import {
   ArrowLeft, 
   Eye, 
   Lock, 
-  Users,
   DollarSign,
-  Info,
   BadgePercent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,6 +25,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
+
+export const dynamic = 'force-dynamic';
 
 export default function NewProjectPage() {
   const router = useRouter();
