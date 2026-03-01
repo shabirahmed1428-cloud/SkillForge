@@ -49,6 +49,15 @@
         "subscriptionPlanId": {
           "type": "string",
           "description": "Reference to the Plan entity."
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "description": "Status of the subscription (active, pending_approval, none).",
+          "enum": ["active", "pending_approval", "none"]
+        },
+        "lastPaymentTransactionId": {
+          "type": "string",
+          "description": "The last transaction ID submitted for approval."
         }
       },
       "required": [

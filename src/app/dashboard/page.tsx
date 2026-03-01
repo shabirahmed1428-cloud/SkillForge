@@ -12,7 +12,8 @@ import {
   File,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -23,6 +24,17 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { 
@@ -34,11 +46,12 @@ import {
   useDatabase, 
   useStorage, 
   setDocumentNonBlocking, 
-  updateDocumentNonBlocking 
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking
 } from '@/firebase';
 import { collection, query, where, limit, doc, serverTimestamp } from 'firebase/firestore';
-import { ref as dbRef, set, update } from 'firebase/database';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref as dbRef, set, update, remove } from 'firebase/database';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit as per storage rules
 
@@ -167,7 +180,8 @@ export default function DashboardPage() {
           fileURL: downloadURL,
           fileSizeMB: fileSizeMB,
           shareKey: shareKey,
-          shareKeyEnabled: true
+          shareKeyEnabled: true,
+          storagePath: `projects/${projectId}/files/${fileName}`
         };
 
         // --- FIRESTORE WRITES ---
@@ -212,6 +226,47 @@ export default function DashboardPage() {
         setProgress(0);
       }
     );
+  };
+
+  const handleDeleteProject = async (projectId: string, fileSizeMB: number, storagePath?: string) => {
+    if (!firestore || !user || !database) return;
+
+    try {
+      // 1. Delete from Storage if path exists
+      if (storage && storagePath) {
+        const fileRef = storageRef(storage, storagePath);
+        deleteObject(fileRef).catch(e => console.warn("Storage deletion failed", e));
+      }
+
+      // 2. Delete from Firestore
+      const projectRef = doc(firestore, 'projects_public', projectId);
+      deleteDocumentNonBlocking(projectRef);
+
+      // 3. Delete from Realtime Database
+      remove(dbRef(database, `projects/${projectId}`));
+
+      // 4. Update storage usage
+      if (userProfile) {
+        const newUsage = Math.max(0, (userProfile.storageUsedMB || 0) - (fileSizeMB || 0));
+        updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+          storageUsedMB: newUsage
+        });
+        update(dbRef(database, `users/${user.uid}`), {
+          storageUsedMB: newUsage
+        });
+      }
+
+      toast({
+        title: "Project deleted",
+        description: "Project has been removed from your portfolio."
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Deletion failed",
+        description: e.message
+      });
+    }
   };
 
   const storageUsed = userProfile?.storageUsedMB ?? 0;
@@ -370,21 +425,47 @@ export default function DashboardPage() {
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {recentProjects?.map(project => (
-                  <Link 
-                    key={project.id} 
-                    href={`/shared/${project.id}`} 
-                    className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate text-foreground">{project.title}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase font-medium">
-                        Direct Access Enabled
-                      </p>
-                    </div>
-                  </Link>
+                  <div key={project.id} className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors group">
+                    <Link 
+                      href={`/shared/${project.id}`} 
+                      className="flex flex-1 items-center gap-3 min-w-0"
+                    >
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate text-foreground">{project.title}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-medium">
+                          Direct Access Enabled
+                        </p>
+                      </div>
+                    </Link>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove "{project.title}" and free up {(project.fileSizeMB || 0).toFixed(2)} MB of storage.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleDeleteProject(project.id, project.fileSizeMB || 0, project.storagePath)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 ))}
                 {(!recentProjects || recentProjects.length === 0) && (
                   <div className="p-8 text-center">
