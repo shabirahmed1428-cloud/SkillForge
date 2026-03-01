@@ -19,9 +19,9 @@ export default function LandingPage() {
   const { user } = useUser();
 
   return (
-    <div className="flex flex-col min-h-screen bg-white animate-in fade-in duration-1000">
+    <div className="flex flex-col min-h-screen bg-white">
       {/* Navigation */}
-      <header className="px-4 lg:px-12 h-20 flex items-center justify-between border-b border-border bg-white sticky top-0 z-50">
+      <header className="px-4 lg:px-12 h-20 flex items-center justify-between border-b border-border bg-white sticky top-0 z-50 animate-fade-up">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl">SF</div>
           <span className="font-headline text-2xl font-bold tracking-tight text-foreground">SkillForge</span>
@@ -50,7 +50,7 @@ export default function LandingPage() {
             <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-accent/20 blur-[120px]" />
           </div>
           
-          <div className="max-w-4xl mx-auto relative z-10">
+          <div className="max-w-4xl mx-auto relative z-10 animate-fade-up delay-100">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mx-auto">
                 <Sparkles className="w-3 h-3" />
@@ -59,10 +59,10 @@ export default function LandingPage() {
               <h1 className="text-5xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
                 Upload. Share. <br /><span className="text-primary">Build Your Portfolio.</span>
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-up delay-200">
                 Upload large files (up to 500MB), showcase your best projects, and share them securely with mentors using unique access keys.
               </p>
-              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center animate-fade-up delay-300">
                 <Button size="lg" asChild className="h-14 px-10 text-lg shadow-xl shadow-primary/30">
                   <Link href={user ? "/dashboard" : "/register"}>{user ? "Go to Dashboard" : "Get Started"}</Link>
                 </Button>
@@ -70,7 +70,7 @@ export default function LandingPage() {
                   <a href="#access-key-section">Enter Access Key</a>
                 </Button>
               </div>
-              <div className="flex items-center gap-6 justify-center pt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-6 justify-center pt-4 text-sm text-muted-foreground animate-fade-up delay-300">
                 <span className="flex items-center gap-2"><HardDrive className="w-4 h-4 text-primary" /> 500MB+ File Support</span>
                 <span className="flex items-center gap-2"><Key className="w-4 h-4 text-primary" /> Secure Key Sharing</span>
               </div>
@@ -79,7 +79,7 @@ export default function LandingPage() {
         </section>
 
         {/* Features Section */}
-        <section id="features" className="py-24 px-4 lg:px-12 bg-white">
+        <section id="features" className="py-24 px-4 lg:px-12 bg-white animate-fade-up delay-300">
           <div className="max-w-7xl mx-auto space-y-16">
             <div className="text-center space-y-4 max-w-3xl mx-auto">
               <h2 className="text-4xl font-bold tracking-tight">Everything you need to showcase your talent.</h2>
@@ -112,7 +112,7 @@ export default function LandingPage() {
         </section>
 
         {/* Access Key Section */}
-        <section id="access-key-section" className="py-24 px-4 lg:px-12 bg-slate-50 border-y border-border">
+        <section id="access-key-section" className="py-24 px-4 lg:px-12 bg-slate-50 border-y border-border animate-fade-up delay-500">
           <AccessKeyForm />
         </section>
       </main>
