@@ -19,7 +19,7 @@ export default function LandingPage() {
   const { user } = useUser();
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-white animate-in fade-in duration-1000">
       {/* Navigation */}
       <header className="px-4 lg:px-12 h-20 flex items-center justify-between border-b border-border bg-white sticky top-0 z-50">
         <Link href="/" className="flex items-center gap-2">
