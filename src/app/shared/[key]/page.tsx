@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -36,7 +35,7 @@ export default function SharedProjectPage() {
   const { key } = useParams();
   const router = useRouter();
   const firestore = useFirestore();
-  const { user } = userUser();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
