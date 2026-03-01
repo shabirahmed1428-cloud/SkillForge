@@ -7,178 +7,65 @@
       "type": "object",
       "description": "Represents a user account in SkillForge, including their profile information, role, storage usage, and subscription plan.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The display name of the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        },
-        "role": {
-          "type": "string",
-          "description": "The role of the user within the platform (student, mentor, admin)."
-        },
-        "photoURL": {
-          "type": "string",
-          "description": "URL to the user's profile picture.",
-          "format": "uri"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user account was created.",
-          "format": "date-time"
-        },
-        "isBanned": {
-          "type": "boolean",
-          "description": "Flag indicating if the user is currently banned from the platform."
-        },
-        "storageUsedMB": {
-          "type": "number",
-          "description": "The amount of storage (in megabytes) currently used by the user."
-        },
-        "storageLimitMB": {
-          "type": "number",
-          "description": "The maximum amount of storage (in megabytes) allowed for the user."
-        },
-        "subscriptionPlanId": {
-          "type": "string",
-          "description": "Reference to the Plan entity."
-        },
-        "subscriptionStatus": {
-          "type": "string",
-          "description": "Status of the subscription (active, pending_approval, none).",
-          "enum": ["active", "pending_approval", "none"]
-        },
-        "lastPaymentTransactionId": {
-          "type": "string",
-          "description": "The last transaction ID submitted for approval."
-        }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isBanned": { "type": "boolean" },
+        "storageUsedMB": { "type": "number" },
+        "storageLimitMB": { "type": "number" },
+        "subscriptionPlanId": { "type": "string" },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "pending_approval", "none"] },
+        "lastPaymentTransactionId": { "type": "string" }
       },
-      "required": [
-        "id",
-        "name",
-        "email",
-        "role",
-        "createdAt",
-        "isBanned",
-        "storageUsedMB",
-        "storageLimitMB",
-        "subscriptionPlanId"
-      ]
+      "required": ["id", "name", "email", "role", "createdAt", "isBanned", "storageUsedMB", "storageLimitMB", "subscriptionPlanId"]
     },
     "Project": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Project",
       "type": "object",
-      "description": "Represents a project created by a user.",
+      "description": "Represents a project created by a user, now with marketplace features.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Project entity."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the project."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the project."
-        },
-        "ownerId": {
-          "type": "string",
-          "description": "Reference to the User who owns the project."
-        },
-        "visibility": {
-          "type": "string",
-          "description": "The visibility setting (public, private, team)."
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the project."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "likesCount": {
-          "type": "number"
-        },
-        "viewsCount": {
-          "type": "number"
-        },
-        "fileURL": {
-          "type": "string",
-          "format": "uri"
-        },
-        "fileSizeMB": {
-          "type": "number"
-        },
-        "shareKey": {
-          "type": "string"
-        },
-        "shareKeyEnabled": {
-          "type": "boolean"
-        },
-        "teamId": {
-          "type": "string",
-          "description": "Optional reference to a Team."
-        }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "visibility": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "price": { "type": "number", "description": "Seller's base price." },
+        "sellerAccount": { "type": "string", "description": "Account info for payment." },
+        "isForSale": { "type": "boolean" },
+        "fileURL": { "type": "string", "format": "uri" },
+        "fileSizeMB": { "type": "number" }
       },
-      "required": [
-        "id",
-        "title",
-        "description",
-        "ownerId",
-        "visibility",
-        "status",
-        "createdAt",
-        "updatedAt",
-        "likesCount",
-        "viewsCount"
-      ]
+      "required": ["id", "title", "ownerId", "visibility", "status"]
     },
-    "Team": {
+    "Transaction": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Team",
+      "title": "Transaction",
       "type": "object",
-      "description": "Represents a collaborative team hub protected by a name and password.",
+      "description": "Tracks project purchases and platform commissions.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string",
-          "description": "Unique name of the team."
-        },
-        "password": {
-          "type": "string",
-          "description": "Password required to access the team hub."
-        },
-        "ownerId": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": ["id", "name", "password", "ownerId", "createdAt"]
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectTitle": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "amountPaid": { "type": "number", "description": "Total amount paid by buyer (Seller Price + 10%)." },
+        "commission": { "type": "number", "description": "10% platform fee." },
+        "paymentProof": { "type": "string", "description": "Transaction ID from EasyPaisa/Bank." },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
@@ -186,9 +73,7 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
+          "schema": { "$ref": "#/backend/entities/User" },
           "description": "Stores user profiles."
         }
       },
@@ -196,30 +81,16 @@
         "path": "/projects_public/{projectId}",
         "definition": {
           "entityName": "Project",
-          "schema": {
-            "$ref": "#/backend/entities/Project"
-          },
+          "schema": { "$ref": "#/backend/entities/Project" },
           "description": "Stores public projects."
         }
       },
       {
-        "path": "/teams/{teamId}",
+        "path": "/transactions/{transactionId}",
         "definition": {
-          "entityName": "Team",
-          "schema": {
-            "$ref": "#/backend/entities/Team"
-          },
-          "description": "Stores team hub configurations."
-        }
-      },
-      {
-        "path": "/teams/{teamId}/projects/{projectId}",
-        "definition": {
-          "entityName": "Project",
-          "schema": {
-            "$ref": "#/backend/entities/Project"
-          },
-          "description": "Stores projects shared within a team hub."
+          "entityName": "Transaction",
+          "schema": { "$ref": "#/backend/entities/Transaction" },
+          "description": "Stores platform purchase records."
         }
       }
     ]

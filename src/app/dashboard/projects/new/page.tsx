@@ -8,9 +8,9 @@ import {
   Eye, 
   Lock, 
   Users,
-  Key,
-  RefreshCw,
-  Copy,
+  DollarSign,
+  Info,
+  BadgePercent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -24,9 +24,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useUser } from '@/firebase';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useUser, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -34,44 +35,27 @@ export default function NewProjectPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [shareKey, setShareKey] = useState('');
+  const [isForSale, setIsForSale] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    visibility: 'public'
+    visibility: 'public',
+    price: '',
+    sellerAccount: ''
   });
 
-  const generateSecureKey = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 20; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setShareKey(result);
-    toast({
-      title: "Key Generated",
-      description: "Secure 20-character key is ready."
-    });
-  };
-
-  const copyKey = () => {
-    navigator.clipboard.writeText(shareKey);
-    toast({
-      title: "Copied!",
-      description: "Key copied to clipboard."
-    });
-  };
+  const sellerPrice = parseFloat(formData.price) || 0;
+  const commission = sellerPrice * 0.1;
+  const buyerPrice = sellerPrice + commission;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !firestore) return;
     setLoading(true);
 
     try {
       const projectId = doc(collection(firestore, 'projects_public')).id;
-      const projectRef = formData.visibility === 'public' 
-        ? doc(firestore, 'projects_public', projectId)
-        : doc(firestore, 'users', user.uid, 'projects', projectId);
+      const projectRef = doc(firestore, 'projects_public', projectId);
 
       const projectData = {
         id: projectId,
@@ -79,31 +63,21 @@ export default function NewProjectPage() {
         description: formData.description,
         ownerId: user.uid,
         visibility: formData.visibility,
-        status: 'draft',
+        status: 'published',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        price: isForSale ? sellerPrice : 0,
+        sellerAccount: isForSale ? formData.sellerAccount : '',
+        isForSale: isForSale,
         likesCount: 0,
         viewsCount: 0,
-        fileURL: 'https://placeholder.com/file',
-        fileSizeMB: 0,
-        shareKey: shareKey || '',
-        shareKeyEnabled: !!shareKey
       };
 
-      await setDoc(projectRef, projectData);
-
-      if (shareKey) {
-        await setDoc(doc(firestore, 'share_keys', shareKey), {
-          id: shareKey,
-          projectId: projectId,
-          projectPath: projectRef.path,
-          createdAt: serverTimestamp()
-        });
-      }
+      setDocumentNonBlocking(projectRef, projectData, { merge: true });
 
       toast({
-        title: "Project Created",
-        description: "Your portfolio item is now live.",
+        title: "Project Published",
+        description: isForSale ? `Your project is listed for sale at RS ${buyerPrice.toFixed(2)}.` : "Your project is now live.",
       });
       router.push('/dashboard');
     } catch (error: any) {
@@ -125,8 +99,8 @@ export default function NewProjectPage() {
       </Button>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create Project</h1>
-        <p className="text-muted-foreground">Add details to build your portfolio.</p>
+        <h1 className="text-3xl font-bold tracking-tight">New Project</h1>
+        <p className="text-muted-foreground">Detail your work and set marketplace options.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -140,7 +114,7 @@ export default function NewProjectPage() {
                 <Label htmlFor="title">Title</Label>
                 <Input 
                   id="title" 
-                  placeholder="e.g. Fullstack E-commerce Platform" 
+                  placeholder="e.g. Modern Architecture Portfolio" 
                   required
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
@@ -151,7 +125,7 @@ export default function NewProjectPage() {
                 <Label htmlFor="description">Description</Label>
                 <Textarea 
                   id="description" 
-                  placeholder="Describe your role, tech stack, and results..." 
+                  placeholder="Tell us about your project..." 
                   className="min-h-[150px]"
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
@@ -161,35 +135,59 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="w-5 h-5 text-primary" />
-                Secure Share Key
-              </CardTitle>
-              <CardDescription>Generate a special key to share private projects.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex gap-2">
-                <Input 
-                  value={shareKey} 
-                  readOnly 
-                  placeholder="Click generate to get a secure key"
-                  className="font-mono text-sm"
-                />
-                <Button type="button" variant="outline" size="icon" onClick={generateSecureKey}>
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-                {shareKey && (
-                  <Button type="button" variant="outline" size="icon" onClick={copyKey}>
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                )}
+          <Card className={isForSale ? "border-primary/50 shadow-lg" : "opacity-70 transition-opacity"}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                  Marketplace Listing
+                </CardTitle>
+                <CardDescription>Sell access to this project to other users.</CardDescription>
               </div>
-              <p className="text-xs text-muted-foreground italic">
-                * Note: Access is granted only if the visitor provides this exact key.
-              </p>
-            </CardContent>
+              <Switch checked={isForSale} onCheckedChange={setIsForSale} />
+            </CardHeader>
+            {isForSale && (
+              <CardContent className="space-y-6 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Your Price (RS)</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="1000"
+                      value={formData.price}
+                      onChange={e => setFormData({...formData, price: e.target.value})}
+                      required={isForSale}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment Account (EasyPaisa/Bank)</Label>
+                    <Input 
+                      placeholder="Enter account details for buyers..."
+                      value={formData.sellerAccount}
+                      onChange={e => setFormData({...formData, sellerAccount: e.target.value})}
+                      required={isForSale}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Your Listing Price:</span>
+                    <span className="font-semibold">RS {sellerPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      Platform Commission (10%): <BadgePercent className="w-3 h-3" />
+                    </span>
+                    <span className="text-destructive font-semibold">+ RS {commission.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-primary/20 pt-2 flex justify-between font-bold text-primary">
+                    <span>Buyer Will See:</span>
+                    <span>RS {buyerPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </div>
 
@@ -205,9 +203,8 @@ export default function NewProjectPage() {
                 onValueChange={v => setFormData({...formData, visibility: v})}
               >
                 {[
-                  { id: 'public', label: 'Public', icon: Eye, desc: 'Anyone can see' },
-                  { id: 'private', label: 'Private', icon: Lock, desc: 'Key-only access' },
-                  { id: 'team', label: 'Team', icon: Users, desc: 'Shared with team' }
+                  { id: 'public', label: 'Public', icon: Eye, desc: 'Marketplace discovery' },
+                  { id: 'private', label: 'Private', icon: Lock, desc: 'Hidden from feed' }
                 ].map((item) => (
                   <div key={item.id}>
                     <RadioGroupItem value={item.id} id={item.id} className="peer sr-only" />
@@ -227,14 +224,9 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-3">
-            <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={loading}>
-              {loading ? 'Creating...' : 'Publish Project'}
-            </Button>
-            <Button variant="outline" type="button" className="w-full" onClick={() => router.push('/dashboard')}>
-              Cancel
-            </Button>
-          </div>
+          <Button type="submit" className="w-full h-12 shadow-lg shadow-primary/20" disabled={loading}>
+            {loading ? 'Creating...' : 'Publish to Portfolio'}
+          </Button>
         </div>
       </form>
     </div>

@@ -17,7 +17,9 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  CreditCard
+  CreditCard,
+  ShoppingCart,
+  DollarSign
 } from 'lucide-react';
 import { 
   Card, 
@@ -55,314 +57,136 @@ export default function AdminDashboardPage() {
   const { toast } = useToast();
   const [rtUsersCount, setRtUsersCount] = useState(0);
 
-  // Fetch all users to calculate global storage
-  const allUsersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'users'));
-  }, [firestore]);
+  // Stats queries
+  const allUsersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
   const { data: allUsers } = useCollection(allUsersQuery);
 
-  // Fetch all public projects to count them
-  const allProjectsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'projects_public'));
-  }, [firestore]);
+  const allProjectsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'projects_public')) : null, [firestore]);
   const { data: allProjects } = useCollection(allProjectsQuery);
 
-  // Query for pending subscription approvals
-  const pendingApprovalsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'users'), 
-      where('subscriptionStatus', '==', 'pending_approval')
-    );
-  }, [firestore]);
-  const { data: pendingUsers, isLoading: pendingLoading } = useCollection(pendingApprovalsQuery);
+  // Transactions query
+  const transactionsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'transactions'), limit(10)) : null, [firestore]);
+  const { data: transactions, isLoading: transLoading } = useCollection(transactionsQuery);
 
-  // Firestore query for recent signups
-  const recentUsersQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'users'), limit(5));
-  }, [firestore]);
-  const { data: recentUsers, isLoading: usersLoading } = useCollection(recentUsersQuery);
+  // Pending Approvals Query (Subscriptions)
+  const pendingApprovalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users'), where('subscriptionStatus', '==', 'pending_approval')) : null, [firestore]);
+  const { data: pendingUsers } = useCollection(pendingApprovalsQuery);
 
-  // Realtime Database connection for live monitoring
   useEffect(() => {
     if (!database) return;
     const usersRef = ref(database, 'users');
     const unsubscribe = onValue(usersRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setRtUsersCount(Object.keys(data).length);
-      }
+      if (snapshot.exists()) setRtUsersCount(Object.keys(snapshot.val()).length);
     });
     return () => unsubscribe();
   }, [database]);
 
-  const handleApproveSubscription = (userId: string, userName: string) => {
-    if (!firestore || !database) return;
-
-    const userRef = doc(firestore, 'users', userId);
-    const updateData = {
-      subscriptionStatus: 'active',
-      subscriptionPlanId: 'pro',
-      storageLimitMB: 2048, // 2GB
-      updatedAt: serverTimestamp()
-    };
-
-    // 1. Update Firestore
-    updateDocumentNonBlocking(userRef, updateData);
-
-    // 2. Update Realtime Database
-    update(ref(database, `users/${userId}`), {
-      subscriptionStatus: 'active',
-      storageLimitMB: 2048
-    });
-
-    toast({
-      title: "Subscription Approved",
-      description: `${userName} has been upgraded to Pro (2GB).`,
-    });
-  };
-
-  const handleRejectSubscription = (userId: string, userName: string) => {
-    if (!firestore || !database) return;
-
-    const userRef = doc(firestore, 'users', userId);
-    updateDocumentNonBlocking(userRef, {
-      subscriptionStatus: 'none',
-      lastPaymentTransactionId: null,
-      updatedAt: serverTimestamp()
-    });
-
-    toast({
-      variant: "destructive",
-      title: "Request Rejected",
-      description: `Upgrade request for ${userName} has been dismissed.`,
-    });
-  };
-
-  // Calculations
+  const totalCommission = transactions?.reduce((acc, t) => acc + (t.commission || 0), 0) || 0;
   const totalStorageUsedMB = allUsers?.reduce((acc, u) => acc + (u.storageUsedMB || 0), 0) || 0;
-  const storageValue = totalStorageUsedMB > 1024 
-    ? `${(totalStorageUsedMB / 1024).toFixed(2)} GB` 
-    : `${totalStorageUsedMB.toFixed(2)} MB`;
-  const activeProjectsCount = allProjects?.length || 0;
-
-  const stats = [
-    { 
-      title: "Total Users (Live)", 
-      value: rtUsersCount.toString(), 
-      change: "+12.5%", 
-      trend: "up", 
-      icon: Users,
-      color: "text-blue-600"
-    },
-    { 
-      title: "Storage Used", 
-      value: storageValue, 
-      change: "+4.2%", 
-      trend: "up", 
-      icon: HardDrive,
-      color: "text-purple-600"
-    },
-    { 
-      title: "Active Projects", 
-      value: activeProjectsCount.toString(), 
-      change: "+8.1%", 
-      trend: "up", 
-      icon: FileText,
-      color: "text-green-600"
-    },
-    { 
-      title: "System Health", 
-      value: "99.9%", 
-      change: "Stable", 
-      trend: "neutral", 
-      icon: Activity,
-      color: "text-orange-600"
-    },
-  ];
 
   return (
     <div className="space-y-8 pb-12">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
-          <p className="text-muted-foreground mt-1">Platform-wide oversight connected to Realtime Database & Auth.</p>
+          <p className="text-muted-foreground mt-1">Marketplace oversight and platform security.</p>
         </div>
         <div className="flex gap-2">
           <Badge variant="outline" className="flex items-center gap-1.5 py-1.5 px-3 border-primary/20 bg-primary/5 text-primary">
             <DbIcon className="w-3.5 h-3.5" />
             Live Connected
           </Badge>
-          <Button asChild variant="outline" className="gap-2">
-            <Link href="/dashboard/admin/users">
-              <Settings className="w-4 h-4" /> Manage All Users
-            </Link>
-          </Button>
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <Card key={index} className="border-none shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs mt-1 flex items-center gap-1">
-                {stat.trend === 'up' && <ArrowUpRight className="w-3 h-3 text-green-500" />}
-                {stat.trend === 'down' && <ArrowDownRight className="w-3 h-3 text-red-500" />}
-                <span className={stat.trend === 'up' ? 'text-green-500' : stat.trend === 'down' ? 'text-red-500' : 'text-muted-foreground'}>
-                  {stat.change}
-                </span>
-                <span className="text-muted-foreground ml-1">from last month</span>
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="border-none shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{rtUsersCount}</div>
+            <p className="text-[10px] text-muted-foreground">Live monitored accounts</p>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Platform Fees</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">RS {totalCommission.toFixed(2)}</div>
+            <p className="text-[10px] text-muted-foreground">10% commission earnings</p>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+            <FileText className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{allProjects?.length || 0}</div>
+            <p className="text-[10px] text-muted-foreground">Public discovery listings</p>
+          </CardContent>
+        </Card>
+        <Card className="border-none shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Storage</CardTitle>
+            <HardDrive className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{(totalStorageUsedMB / 1024).toFixed(2)} GB</div>
+            <p className="text-[10px] text-muted-foreground">Total asset consumption</p>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Pending Approvals Section */}
-      <Card className="border-none shadow-md border-t-4 border-t-orange-500 overflow-hidden">
-        <CardHeader className="bg-orange-50/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Clock className="w-4 h-4 text-orange-500" />
-                Pending Upgrade Requests
-              </CardTitle>
-              <CardDescription>Review Transaction IDs from EasyPaisa and approve storage upgrades.</CardDescription>
-            </div>
-            <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
-              {pendingUsers?.length || 0} Request{(pendingUsers?.length !== 1) ? 's' : ''}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Transaction ID</TableHead>
-                <TableHead>Current Limit</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendingUsers?.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">{u.name}</span>
-                      <span className="text-xs text-muted-foreground">{u.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <code className="bg-muted px-2 py-1 rounded text-xs font-mono border">
-                      {u.lastPaymentTransactionId || 'N/A'}
-                    </code>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {u.storageLimitMB}MB
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="h-8 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRejectSubscription(u.id, u.name)}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" /> Reject
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className="h-8 bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => handleApproveSubscription(u.id, u.name)}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" /> Approve Pro
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {pendingLoading && (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-12 animate-pulse bg-muted/20" />
-                </TableRow>
-              )}
-              {(!pendingUsers || pendingUsers.length === 0) && !pendingLoading && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
-                    <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                    No pending payment approvals at this time.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 border-none shadow-md overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b">
-            <div className="flex items-center justify-between">
+          <CardHeader className="bg-primary/5 border-b">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-primary" />
               <div>
-                <CardTitle className="text-base font-bold">Platform Users</CardTitle>
-                <CardDescription>Latest signups verified via Authentication.</CardDescription>
+                <CardTitle className="text-base font-bold">Marketplace Transactions</CardTitle>
+                <CardDescription>Track project sales and verify payments.</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/dashboard/admin/users" className="text-primary">View All</Link>
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Project / Buyer</TableHead>
+                  <TableHead>Total Paid</TableHead>
+                  <TableHead>Commission</TableHead>
+                  <TableHead>Proof</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentUsers?.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">
+                {transactions?.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>
                       <div className="flex flex-col">
-                        <span>{u.name}</span>
-                        <span className="text-xs text-muted-foreground">{u.email}</span>
+                        <span className="font-semibold text-sm">{t.projectTitle}</span>
+                        <span className="text-[10px] text-muted-foreground">Buyer: {t.buyerName}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize text-[10px] py-0">{u.role}</Badge>
+                    <TableCell className="font-bold text-green-700 text-xs">
+                      RS {t.amountPaid?.toFixed(2)}
                     </TableCell>
-                    <TableCell className="capitalize">{u.subscriptionPlanId}</TableCell>
+                    <TableCell className="text-xs font-medium text-primary">
+                      RS {t.commission?.toFixed(2)}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant={u.isBanned ? "destructive" : "outline"} className={u.isBanned ? "" : "bg-green-50 text-green-700 border-green-200"}>
-                        {u.isBanned ? "Banned" : "Active"}
-                      </Badge>
+                      <code className="text-[9px] bg-muted px-1.5 py-0.5 rounded border">{t.paymentProof}</code>
                     </TableCell>
                   </TableRow>
                 ))}
-                {usersLoading && [1, 2, 3].map((i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={4} className="h-12 animate-pulse bg-muted/20" />
-                  </TableRow>
-                ))}
-                {(!recentUsers || recentUsers.length === 0) && !usersLoading && (
+                {(!transactions || transactions.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      No user records found in Firestore.
+                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                      No marketplace sales recorded yet.
                     </TableCell>
                   </TableRow>
                 )}
@@ -371,45 +195,36 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card className="border-none shadow-md bg-primary text-primary-foreground">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheck className="w-5 h-5" />
-                Auth Security
-              </CardTitle>
-              <CardDescription className="text-primary-foreground/80">
-                Connected to Firebase Auth. Monitoring suspicious logins in real-time.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="secondary" className="w-full" asChild>
-                <Link href="/dashboard/admin/users">Open Management Hub</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start gap-2" asChild>
-                <Link href="/dashboard/admin/analytics">
-                  <TrendingUp className="w-4 h-4" /> Global Analytics
-                </Link>
-              </Button>
-              <Button variant="outline" className="w-full justify-start gap-2" asChild>
-                <Link href="/dashboard/admin/users">
-                  <Users className="w-4 h-4" /> Manage All Users
-                </Link>
-              </Button>
-              <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:bg-destructive/10">
-                <ShieldCheck className="w-4 h-4" /> Global Maintenance Mode
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border-none shadow-md border-t-4 border-t-orange-500 overflow-hidden h-fit">
+          <CardHeader className="bg-orange-50/50">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-orange-500" />
+              Pending Upgrades
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border">
+              {pendingUsers?.map((u) => (
+                <div key={u.id} className="p-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-bold">{u.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{u.lastPaymentTransactionId}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[8px] bg-white">Storage Upgrade</Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="h-7 text-[10px] flex-1 bg-green-600 hover:bg-green-700">Approve</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-[10px] flex-1 text-destructive">Reject</Button>
+                  </div>
+                </div>
+              ))}
+              {(!pendingUsers || pendingUsers.length === 0) && (
+                <p className="p-8 text-center text-xs text-muted-foreground">No pending upgrades.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
