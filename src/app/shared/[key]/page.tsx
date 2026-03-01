@@ -36,7 +36,7 @@ export default function SharedProjectPage() {
   const { key } = useParams();
   const router = useRouter();
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user } = userUser();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
@@ -50,10 +50,12 @@ export default function SharedProjectPage() {
       if (!key || typeof key !== 'string' || !firestore) return;
       try {
         setLoading(true);
+        // Try direct project ID first
         const publicProjectDoc = await getDoc(doc(firestore, 'projects_public', key));
         if (publicProjectDoc.exists()) {
           setProject(publicProjectDoc.data());
         } else {
+          // Then try as a secure share key
           const keyDoc = await getDoc(doc(firestore, 'share_keys', key));
           if (keyDoc.exists()) {
             const { projectPath } = keyDoc.data();

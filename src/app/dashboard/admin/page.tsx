@@ -81,6 +81,18 @@ export default function AdminDashboardPage() {
     return () => unsubscribe();
   }, [database]);
 
+  const handleApproveSubscription = (userId: string, userName: string) => {
+    if (!firestore) return;
+    const userRef = doc(firestore, 'users', userId);
+    updateDocumentNonBlocking(userRef, {
+      subscriptionStatus: 'active',
+      subscriptionPlanId: 'pro',
+      storageLimitMB: 2048,
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: "Approved", description: `${userName} upgraded to Pro.` });
+  };
+
   const totalCommission = transactions?.reduce((acc, t) => acc + (t.commission || 0), 0) || 0;
   const totalStorageUsedMB = allUsers?.reduce((acc, u) => acc + (u.storageUsedMB || 0), 0) || 0;
 
@@ -214,7 +226,13 @@ export default function AdminDashboardPage() {
                     <Badge variant="outline" className="text-[8px] bg-white">Storage Upgrade</Badge>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" className="h-7 text-[10px] flex-1 bg-green-600 hover:bg-green-700">Approve</Button>
+                    <Button 
+                      size="sm" 
+                      className="h-7 text-[10px] flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={() => handleApproveSubscription(u.id, u.name)}
+                    >
+                      Approve
+                    </Button>
                     <Button size="sm" variant="ghost" className="h-7 text-[10px] flex-1 text-destructive">Reject</Button>
                   </div>
                 </div>
